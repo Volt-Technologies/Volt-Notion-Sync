@@ -26,7 +26,10 @@ export async function resolveMappings(
   client: Client,
   config: Config,
 ): Promise<ResolvedMapping[]> {
-  const rootChildren = await listNamedChildren(client, config.notion.rootPageId);
+  const needsRootLookup = config.mappings.some((m) => !m.notionId && m.notion);
+  const rootChildren = needsRootLookup
+    ? await listNamedChildren(client, config.notion.rootPageId)
+    : [];
   const resolved: ResolvedMapping[] = [];
 
   for (const m of config.mappings) {

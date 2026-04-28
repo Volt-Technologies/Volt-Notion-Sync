@@ -1,18 +1,14 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { writeFile, mkdir, access, readFile } from 'node:fs/promises';
+import { writeFile, mkdir, access, copyFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { loadConfig, ConfigError } from './config/load.js';
-import { QUICKSTART_TEMPLATE_YAML } from './config/defaults.js';
+import { QUICKSTART_TEMPLATE_YAML, WORKFLOW_TEMPLATE_YAML } from './config/defaults.js';
 import { createNotionClient } from './notion/client.js';
 import { resolveMappings, inspectRoot } from './mapping/resolve.js';
 import { pull } from './sync/pull.js';
 import { push } from './sync/push.js';
 import type { Config, ResolvedMapping } from './config/types.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const program = new Command();
 program
@@ -122,40 +118,39 @@ program
 
 program
   .command('scaffold')
-  .description('Drop the workflow + config templates into the current repo')
+  .description('Drop the workflow + config templates and CLI bundle into the current repo')
   .option('--repo <path>', 'project repo root', process.cwd())
   .option('--force', 'overwrite existing files', false)
+  .option('--bundle <path>', 'path to volt-notion-sync.cjs to copy into .volt/.cli/')
   .action(async (opts) => {
     const repoRoot = path.resolve(opts.repo);
-    const targets: Array<{ from: string; to: string; fallback?: string }> = [
+    const targets: Array<{ to: string; content: string }> = [
+      { to: path.join(repoRoot, '.volt', '.volt-sync.yml'), content: QUICKSTART_TEMPLATE_YAML },
       {
-        from: path.join(__dirname, '..', 'templates', 'volt-sync.yml'),
-        to: path.join(repoRoot, '.volt', '.volt-sync.yml'),
-        fallback: QUICKSTART_TEMPLATE_YAML,
-      },
-      {
-        from: path.join(__dirname, '..', 'templates', 'workflow.yml'),
         to: path.join(repoRoot, '.github', 'workflows', 'volt-notion-sync.yml'),
+        content: WORKFLOW_TEMPLATE_YAML,
       },
     ];
     for (const t of targets) {
-      let content: string;
-      try {
-        content = await readFile(t.from, 'utf-8');
-      } catch {
-        if (!t.fallback) {
-          console.error(`missing template: ${t.from}`);
-          continue;
-        }
-        content = t.fallback;
-      }
       if (!opts.force && (await exists(t.to))) {
         console.log(`skip (exists): ${path.relative(repoRoot, t.to)}`);
         continue;
       }
       await mkdir(path.dirname(t.to), { recursive: true });
-      await writeFile(t.to, content, 'utf-8');
+      await writeFile(t.to, t.content, 'utf-8');
       console.log(`wrote: ${path.relative(repoRoot, t.to)}`);
+    }
+    if (opts.bundle) {
+      const dest = path.join(repoRoot, '.volt', '.cli', 'volt-notion-sync.cjs');
+      if (!opts.force && (await exists(dest))) {
+        console.log(`skip (exists): ${path.relative(repoRoot, dest)} (use --force to update)`);
+      } else {
+        await mkdir(path.dirname(dest), { recursive: true });
+        await copyFile(opts.bundle, dest);
+        console.log(`wrote: ${path.relative(repoRoot, dest)}`);
+      }
+    } else {
+      console.log('note: pass --bundle <path> to copy the CLI bundle into .volt/.cli/');
     }
   });
 

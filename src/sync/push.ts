@@ -220,10 +220,20 @@ function buildPropertyValue(type: string, value: unknown, _title: string | null)
     case 'phone_number':
       return { phone_number: value ? String(value) : null };
     case 'date':
-      return value ? { date: { start: String(value) } } : { date: null };
+      if (!value) return { date: null };
+      return { date: { start: toIsoDate(value) } };
     default:
       return undefined;
   }
+}
+
+function toIsoDate(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const s = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s;
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return s;
 }
 
 async function writeBackId(filePath: string, notionId: string, notionUrl: string): Promise<void> {

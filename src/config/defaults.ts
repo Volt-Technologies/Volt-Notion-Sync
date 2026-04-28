@@ -1,5 +1,79 @@
 import type { Config } from './types.js';
 
+export const WORKFLOW_TEMPLATE_YAML = `name: Volt Notion Sync
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.volt/**'
+      - '!.volt/.sync-state.json'
+
+concurrency:
+  group: volt-notion-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Sync direct-mode mappings (commit to main)
+        env:
+          NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
+        run: node .volt/.cli/volt-notion-sync.cjs sync --repo "$GITHUB_WORKSPACE" --strategy direct
+
+      - name: Commit and push direct-mode changes
+        run: |
+          git config user.name  "volt-notion-sync[bot]"
+          git config user.email "volt-notion-sync[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "chore(notion-sync): pull $(date -u +%FT%TZ)"
+            git push
+          fi
+
+      - name: Sync PR-mode mappings (open PR per mapping)
+        env:
+          NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ROUTES=$(node .volt/.cli/volt-notion-sync.cjs routes --no-resolve --repo "$GITHUB_WORKSPACE")
+          PR_COUNT=$(echo "$ROUTES" | jq '.pr | length')
+          if [ "$PR_COUNT" = "0" ]; then
+            echo "no pr-mode mappings"
+            exit 0
+          fi
+          node .volt/.cli/volt-notion-sync.cjs sync --repo "$GITHUB_WORKSPACE" --strategy pr || true
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "no pr-mode changes"
+            exit 0
+          fi
+          BRANCH="notion-sync/pr-$(date -u +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "chore(notion-sync): pr-mode pull $(date -u +%FT%TZ)"
+          git push -u origin "$BRANCH"
+          gh pr create \\
+            --base main \\
+            --head "$BRANCH" \\
+            --title "Notion sync (review): $(date -u +%FT%TZ)" \\
+            --body "Automated PR for review-required Notion mappings (commitStrategy: pr)."
+`;
+
 export const QUICKSTART_TEMPLATE_YAML = `version: 1
 notion:
   teamspaceId: REPLACE_WITH_TEAMSPACE_UUID
