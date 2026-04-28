@@ -1,0 +1,50 @@
+version: 1
+notion:
+  teamspaceId: REPLACE_WITH_TEAMSPACE_UUID
+  rootPageId: REPLACE_WITH_PROJECT_HOME_PAGE_UUID
+
+defaultDirection: both
+commitStrategy: direct
+conflictPolicy: abort
+
+mappings:
+  - notion: "Process Flows"
+    local: docs/process-flows
+  - notion: "Waterfall Tasks"
+    local: projectmanagement/waterfall-tasks
+  - notion: "Project Definition"
+    local: docs/project-definition
+  - notion: "Features"
+    local: docs/features
+    optional: true
+  - notion: "Resources"
+    local: docs/resources
+  - notion: "Miscellaneous"
+    local: docs/misc
+
+  - notion: "Meetings"
+    local: projectmanagement/meetings
+    type: database
+  - notion: "PM Tasks"
+    local: projectmanagement/pm-tasks
+    type: database
+    commitStrategy: pr
+    direction: pull
+
+notionIgnore:
+  - "Settings"
+  - "Task Execution Log"
+
+localIgnore:
+  - implementation/**
+  - powerbi/**
+  - tools/**
+  - "**/*.al"
+  - "**/*.json"
+  - "**/*.csv"
+  - "**/.gitkeep"
+  - .sync-state.json
+
+markdown:
+  frontmatter: true
+  attachments: .attachments

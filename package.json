@@ -1,0 +1,41 @@
+{
+  "name": "@volt/notion-sync",
+  "version": "0.1.0",
+  "description": "Sync a Notion teamspace to/from a project GitHub repo's .volt folder as markdown",
+  "type": "module",
+  "main": "dist/cli.js",
+  "bin": {
+    "volt-notion-sync": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/cli.js",
+    "pull": "npm run build && node dist/cli.js pull",
+    "sync": "npm run build && node dist/cli.js sync",
+    "scaffold": "npm run build && node dist/cli.js scaffold"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.3.0",
+    "commander": "^12.1.0",
+    "gray-matter": "^4.0.3",
+    "marked": "^15.0.4",
+    "minimatch": "^10.0.1",
+    "yaml": "^2.6.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2"
+  }
+}
