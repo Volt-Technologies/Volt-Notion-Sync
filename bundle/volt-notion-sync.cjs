@@ -26930,6 +26930,43 @@ function tokenToBlocks(token) {
     }
     case "paragraph": {
       const t = token;
+      const inner = t.tokens ?? [];
+      const onlyToken = inner.length === 1 ? inner[0] : null;
+      if (onlyToken?.type === "image") {
+        const img = onlyToken;
+        return [
+          {
+            object: "block",
+            type: "image",
+            image: {
+              type: "external",
+              external: { url: img.href },
+              caption: img.text ? [{ type: "text", text: { content: truncate(img.text) } }] : []
+            }
+          }
+        ];
+      }
+      if (onlyToken?.type === "link") {
+        const link2 = onlyToken;
+        if (isVideoUrl(link2.href)) {
+          return [
+            {
+              object: "block",
+              type: "video",
+              video: { type: "external", external: { url: link2.href } }
+            }
+          ];
+        }
+        if (link2.text === link2.href || link2.raw.startsWith("<") || isBareUrlText(link2.text, link2.href)) {
+          return [
+            {
+              object: "block",
+              type: "bookmark",
+              bookmark: { url: link2.href }
+            }
+          ];
+        }
+      }
       return [
         { object: "block", type: "paragraph", paragraph: { rich_text: inlineToRichText(t.text) } }
       ];
@@ -27111,6 +27148,18 @@ function sameLink(a, b) {
 function truncate(text) {
   return text.length > NOTION_TEXT_LIMIT ? text.slice(0, NOTION_TEXT_LIMIT) : text;
 }
+function isVideoUrl(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    return host === "youtube.com" || host === "youtu.be" || host === "m.youtube.com" || host === "vimeo.com" || host === "player.vimeo.com" || host === "loom.com" || host === "www.loom.com";
+  } catch {
+    return false;
+  }
+}
+function isBareUrlText(text, href) {
+  return text.trim() === href.trim();
+}
 function mapCodeLanguage(lang) {
   const l = (lang ?? "").toLowerCase().trim();
   const supported = /* @__PURE__ */ new Set([
@@ -27264,10 +27313,14 @@ async function pushDatabaseRow(opts, file, parsed, state, result, log) {
     return;
   }
   const properties = await buildPropertiesFromFrontmatter(opts.client, dataSourceId, parsed);
+  const blocks = markdownToBlocks(parsed.body);
   if (parsed.notionId) {
     await opts.client.pages.update({ page_id: parsed.notionId, properties });
+    if (blocks.length > 0 || parsed.body.trim()) {
+      await replacePageBlocks(opts.client, parsed.notionId, blocks);
+    }
     result.rowsUpdated += 1;
-    log(`  row updated: ${file.relPath}`);
+    log(`  row updated: ${file.relPath} (${blocks.length} blocks)`);
     state.entries[parsed.notionId] = {
       notionId: parsed.notionId,
       localPath: file.relPath,
@@ -27279,11 +27332,11 @@ async function pushDatabaseRow(opts, file, parsed, state, result, log) {
     const created = await c.request({
       path: "pages",
       method: "post",
-      body: { parent: { data_source_id: dataSourceId }, properties }
+      body: { parent: { data_source_id: dataSourceId }, properties, children: blocks }
     });
     await writeBackId(file.absPath, created.id, created.url ?? "");
     result.rowsCreated += 1;
-    log(`  row created: ${file.relPath} \u2192 ${created.id}`);
+    log(`  row created: ${file.relPath} \u2192 ${created.id} (${blocks.length} blocks)`);
     state.entries[created.id] = {
       notionId: created.id,
       localPath: file.relPath,

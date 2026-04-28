@@ -44,6 +44,45 @@ function tokenToBlocks(token: Token): NotionBlock[] {
     }
     case 'paragraph': {
       const t = token as Tokens.Paragraph;
+      const inner = t.tokens ?? [];
+      const onlyToken = inner.length === 1 ? inner[0] : null;
+      if (onlyToken?.type === 'image') {
+        const img = onlyToken as Tokens.Image;
+        return [
+          {
+            object: 'block',
+            type: 'image',
+            image: {
+              type: 'external',
+              external: { url: img.href },
+              caption: img.text
+                ? [{ type: 'text', text: { content: truncate(img.text) } }]
+                : [],
+            },
+          },
+        ];
+      }
+      if (onlyToken?.type === 'link') {
+        const link = onlyToken as Tokens.Link;
+        if (isVideoUrl(link.href)) {
+          return [
+            {
+              object: 'block',
+              type: 'video',
+              video: { type: 'external', external: { url: link.href } },
+            },
+          ];
+        }
+        if (link.text === link.href || link.raw.startsWith('<') || isBareUrlText(link.text, link.href)) {
+          return [
+            {
+              object: 'block',
+              type: 'bookmark',
+              bookmark: { url: link.href },
+            },
+          ];
+        }
+      }
       return [
         { object: 'block', type: 'paragraph', paragraph: { rich_text: inlineToRichText(t.text) } },
       ];
@@ -248,6 +287,28 @@ function sameLink(a: { url: string } | null | undefined, b: { url: string } | nu
 
 function truncate(text: string): string {
   return text.length > NOTION_TEXT_LIMIT ? text.slice(0, NOTION_TEXT_LIMIT) : text;
+}
+
+function isVideoUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, '');
+    return (
+      host === 'youtube.com' ||
+      host === 'youtu.be' ||
+      host === 'm.youtube.com' ||
+      host === 'vimeo.com' ||
+      host === 'player.vimeo.com' ||
+      host === 'loom.com' ||
+      host === 'www.loom.com'
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isBareUrlText(text: string, href: string): boolean {
+  return text.trim() === href.trim();
 }
 
 function mapCodeLanguage(lang: string | undefined): string {

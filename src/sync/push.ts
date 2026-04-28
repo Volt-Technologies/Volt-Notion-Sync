@@ -113,10 +113,15 @@ async function pushDatabaseRow(
   }
   const properties = await buildPropertiesFromFrontmatter(opts.client, dataSourceId, parsed);
 
+  const blocks = markdownToBlocks(parsed.body);
+
   if (parsed.notionId) {
     await opts.client.pages.update({ page_id: parsed.notionId, properties: properties as never });
+    if (blocks.length > 0 || parsed.body.trim()) {
+      await replacePageBlocks(opts.client, parsed.notionId, blocks);
+    }
     result.rowsUpdated += 1;
-    log(`  row updated: ${file.relPath}`);
+    log(`  row updated: ${file.relPath} (${blocks.length} blocks)`);
     state.entries[parsed.notionId] = {
       notionId: parsed.notionId,
       localPath: file.relPath,
@@ -128,11 +133,11 @@ async function pushDatabaseRow(
     const created = await c.request({
       path: 'pages',
       method: 'post',
-      body: { parent: { data_source_id: dataSourceId }, properties },
+      body: { parent: { data_source_id: dataSourceId }, properties, children: blocks },
     });
     await writeBackId(file.absPath, created.id, created.url ?? '');
     result.rowsCreated += 1;
-    log(`  row created: ${file.relPath} → ${created.id}`);
+    log(`  row created: ${file.relPath} → ${created.id} (${blocks.length} blocks)`);
     state.entries[created.id] = {
       notionId: created.id,
       localPath: file.relPath,
