@@ -2,9 +2,19 @@ import type { Config } from './types.js';
 
 export const WORKFLOW_TEMPLATE_YAML = `name: Volt Notion Sync
 
+# Triggers, in order of how this workflow gets woken up:
+#   - repository_dispatch  — Fired by the Volt platform when Notion sends a
+#                            webhook event for this project (debounced 60s).
+#                            This is the primary path; expect ~5-30s end-to-end.
+#   - schedule (6h cron)   — Safety net for missed/late webhooks and outages.
+#   - workflow_dispatch    — Manual "sync now" from the GitHub UI.
+#   - push                 — When a developer commits to .volt/ on main, push
+#                            those changes back to Notion.
 on:
+  repository_dispatch:
+    types: [notion-changed]
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
   push:
     branches: [main]

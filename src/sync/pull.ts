@@ -159,7 +159,8 @@ async function pullDatabase(
     if (skipIds.has(row.id)) continue;
     const fileRel = path.posix.join(mapping.local, slugify(row.title || row.id) + '.md');
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
-    const content = renderRowMarkdown(opts.config, row, exp);
+    const body = await pageBlocksToMarkdown(opts.client, row.id);
+    const content = renderRowMarkdown(opts.config, row, exp, body);
     await writeFileEnsured(filePath, content);
     writtenPaths.add(path.normalize(filePath));
 
@@ -186,27 +187,25 @@ function renderMarkdownFile(config: Config, node: NotionPageNode, body: string):
   return `---\n${YAML.stringify(fm).trimEnd()}\n---\n\n# ${node.title}\n\n${body}`;
 }
 
-function renderRowMarkdown(config: Config, row: NormalizedRow, exp: DatabaseExport): string {
-  const props = row.properties;
-  const body = Object.entries(props)
-    .filter(([, v]) => v !== null && v !== undefined && v !== '')
-    .map(([k, v]) => `- **${k}**: ${formatValue(v)}`)
-    .join('\n');
-  if (!config.markdown.frontmatter) return `# ${row.title}\n\n${body}\n`;
+function renderRowMarkdown(
+  config: Config,
+  row: NormalizedRow,
+  exp: DatabaseExport,
+  body: string,
+): string {
+  const trimmedBody = body.trim();
+  if (!config.markdown.frontmatter) {
+    return `# ${row.title}\n\n${trimmedBody}\n`;
+  }
   const fm = {
     notion_id: row.id,
     notion_url: row.url,
     last_edited_time: row.lastEditedTime,
     title: row.title,
     data_source_id: exp.dataSourceId,
-    properties: props,
+    properties: row.properties,
   };
-  return `---\n${YAML.stringify(fm).trimEnd()}\n---\n\n# ${row.title}\n\n${body}\n`;
-}
-
-function formatValue(v: unknown): string {
-  if (Array.isArray(v)) return v.map((x) => String(x)).join(', ');
-  return String(v);
+  return `---\n${YAML.stringify(fm).trimEnd()}\n---\n\n# ${row.title}\n\n${trimmedBody}\n`;
 }
 
 async function writeFileEnsured(filePath: string, content: string): Promise<void> {

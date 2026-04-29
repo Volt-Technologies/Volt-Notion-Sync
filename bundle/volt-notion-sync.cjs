@@ -22066,9 +22066,19 @@ ${issues}`, configPath);
 // src/config/defaults.ts
 var WORKFLOW_TEMPLATE_YAML = `name: Volt Notion Sync
 
+# Triggers, in order of how this workflow gets woken up:
+#   - repository_dispatch  \u2014 Fired by the Volt platform when Notion sends a
+#                            webhook event for this project (debounced 60s).
+#                            This is the primary path; expect ~5-30s end-to-end.
+#   - schedule (6h cron)   \u2014 Safety net for missed/late webhooks and outages.
+#   - workflow_dispatch    \u2014 Manual "sync now" from the GitHub UI.
+#   - push                 \u2014 When a developer commits to .volt/ on main, push
+#                            those changes back to Notion.
 on:
+  repository_dispatch:
+    types: [notion-changed]
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
   push:
     branches: [main]
@@ -24605,7 +24615,8 @@ async function pullDatabase(opts, mapping, state, writtenPaths, skipIds) {
     if (skipIds.has(row.id)) continue;
     const fileRel = import_node_path3.default.posix.join(mapping.local, slugify(row.title || row.id) + ".md");
     const filePath = import_node_path3.default.join(opts.repoRoot, ".volt", fileRel);
-    const content = renderRowMarkdown(opts.config, row, exp);
+    const body = await pageBlocksToMarkdown(opts.client, row.id);
+    const content = renderRowMarkdown(opts.config, row, exp, body);
     await writeFileEnsured(filePath, content);
     writtenPaths.add(import_node_path3.default.normalize(filePath));
     state.entries[row.id] = {
@@ -24635,20 +24646,21 @@ ${import_yaml2.default.stringify(fm).trimEnd()}
 
 ${body}`;
 }
-function renderRowMarkdown(config, row, exp) {
-  const props = row.properties;
-  const body = Object.entries(props).filter(([, v]) => v !== null && v !== void 0 && v !== "").map(([k, v]) => `- **${k}**: ${formatValue(v)}`).join("\n");
-  if (!config.markdown.frontmatter) return `# ${row.title}
+function renderRowMarkdown(config, row, exp, body) {
+  const trimmedBody = body.trim();
+  if (!config.markdown.frontmatter) {
+    return `# ${row.title}
 
-${body}
+${trimmedBody}
 `;
+  }
   const fm = {
     notion_id: row.id,
     notion_url: row.url,
     last_edited_time: row.lastEditedTime,
     title: row.title,
     data_source_id: exp.dataSourceId,
-    properties: props
+    properties: row.properties
   };
   return `---
 ${import_yaml2.default.stringify(fm).trimEnd()}
@@ -24656,12 +24668,8 @@ ${import_yaml2.default.stringify(fm).trimEnd()}
 
 # ${row.title}
 
-${body}
+${trimmedBody}
 `;
-}
-function formatValue(v) {
-  if (Array.isArray(v)) return v.map((x) => String(x)).join(", ");
-  return String(v);
 }
 async function writeFileEnsured(filePath, content) {
   await (0, import_promises4.mkdir)(import_node_path3.default.dirname(filePath), { recursive: true });
