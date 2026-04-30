@@ -22082,9 +22082,10 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    # Only trigger on markdown changes under .volt/ \u2014 the engine-managed
+    # bundle (.volt/.cli/**), state file, and config don't need to push.
     paths:
-      - '.volt/**'
-      - '!.volt/.sync-state.json'
+      - '.volt/**/*.md'
 
 concurrency:
   group: volt-notion-sync
@@ -22105,22 +22106,74 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Sync direct-mode mappings (commit to main)
+      # \u2500\u2500\u2500 Notion \u2192 repo (PULL ONLY) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+      # Triggered by webhook dispatch, cron, or manual run. We deliberately
+      # do NOT push here \u2014 pushing on these triggers would write the just-
+      # pulled markdown back to Notion, which Notion treats as another edit
+      # and fires another webhook, looping forever.
+      - name: Pull from Notion
+        if: github.event_name != 'push'
         env:
           NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
-        run: node .volt/.cli/volt-notion-sync.cjs sync --repo "$GITHUB_WORKSPACE" --strategy direct
+        run: node .volt/.cli/volt-notion-sync.cjs pull --repo "$GITHUB_WORKSPACE"
 
-      - name: Commit and push direct-mode changes
+      - name: Commit pulled changes (direct-mode)
+        if: github.event_name != 'push'
         run: |
           git config user.name  "volt-notion-sync[bot]"
           git config user.email "volt-notion-sync[bot]@users.noreply.github.com"
           if [ -n "$(git status --porcelain)" ]; then
             git add -A
-            git commit -m "chore(notion-sync): pull $(date -u +%FT%TZ)"
+            # [skip ci] keeps the resulting commit from re-triggering this
+            # same workflow on the push trigger below.
+            git commit -m "chore(notion-sync): pull $(date -u +%FT%TZ) [skip ci]"
+            git push
+          else
+            echo "no changes"
+          fi
+
+      # \u2500\u2500\u2500 repo \u2192 Notion (PUSH ONLY) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+      # Only when a developer commits to .volt/**/*.md on main, and never
+      # when the actor is our own bot or the commit was tagged [skip ci].
+      #
+      # Also: even if the workflow was triggered by a markdown change, the
+      # specific files in this commit may all be ignored by localIgnore
+      # patterns. We do an early exit here to avoid a useless Node startup.
+      - name: Detect pushable markdown changes
+        id: pushable_changes
+        if: github.event_name == 'push' && github.actor != 'volt-notion-sync[bot]' && !contains(github.event.head_commit.message, '[skip ci]')
+        run: |
+          CHANGED_MD=$(git diff --name-only "\${{ github.event.before }}" "\${{ github.event.after }}" -- '.volt/**/*.md' || true)
+          if [ -z "$CHANGED_MD" ]; then
+            echo "no markdown changes in .volt/ \u2014 skipping push"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pushable .md files in this push:"
+            echo "$CHANGED_MD"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push to Notion
+        if: github.event_name == 'push' && github.actor != 'volt-notion-sync[bot]' && !contains(github.event.head_commit.message, '[skip ci]') && steps.pushable_changes.outputs.skip != 'true'
+        env:
+          NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
+        run: node .volt/.cli/volt-notion-sync.cjs push --repo "$GITHUB_WORKSPACE"
+
+      - name: Commit notion_id write-back from new pages
+        if: github.event_name == 'push' && github.actor != 'volt-notion-sync[bot]' && !contains(github.event.head_commit.message, '[skip ci]') && steps.pushable_changes.outputs.skip != 'true'
+        run: |
+          git config user.name  "volt-notion-sync[bot]"
+          git config user.email "volt-notion-sync[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "chore(notion-sync): write back notion_id $(date -u +%FT%TZ) [skip ci]"
             git push
           fi
 
+      # \u2500\u2500\u2500 PR-mode mappings \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+      # Same trigger logic as the direct-mode pull above.
       - name: Sync PR-mode mappings (open PR per mapping)
+        if: github.event_name != 'push'
         env:
           NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
           GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
@@ -22131,7 +22184,7 @@ jobs:
             echo "no pr-mode mappings"
             exit 0
           fi
-          node .volt/.cli/volt-notion-sync.cjs sync --repo "$GITHUB_WORKSPACE" --strategy pr || true
+          node .volt/.cli/volt-notion-sync.cjs pull --repo "$GITHUB_WORKSPACE" || true
           if [ -z "$(git status --porcelain)" ]; then
             echo "no pr-mode changes"
             exit 0
@@ -22139,7 +22192,7 @@ jobs:
           BRANCH="notion-sync/pr-$(date -u +%Y%m%d-%H%M%S)"
           git checkout -b "$BRANCH"
           git add -A
-          git commit -m "chore(notion-sync): pr-mode pull $(date -u +%FT%TZ)"
+          git commit -m "chore(notion-sync): pr-mode pull $(date -u +%FT%TZ) [skip ci]"
           git push -u origin "$BRANCH"
           gh pr create \\
             --base main \\
@@ -27268,6 +27321,15 @@ async function push(opts) {
   const files = await listLocalFiles(opts.repoRoot, pushable, opts.config.localIgnore);
   for (const file of files) {
     const parsed = await parseMarkdownFile(file.absPath);
+    if (parsed.notionId) {
+      const recorded = state.entries[parsed.notionId];
+      const currentHash = hashContent(await (0, import_promises7.readFile)(file.absPath, "utf-8"));
+      if (recorded && recorded.contentHash === currentHash) {
+        log(`  unchanged, skip: ${file.relPath}`);
+        result.skipped += 1;
+        continue;
+      }
+    }
     if (file.mapping.type === "database") {
       await pushDatabaseRow(opts, file, parsed, state, result, log);
     } else {

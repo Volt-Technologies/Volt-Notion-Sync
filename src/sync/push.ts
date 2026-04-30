@@ -41,6 +41,19 @@ export async function push(opts: PushOptions): Promise<PushResult> {
 
   for (const file of files) {
     const parsed = await parseMarkdownFile(file.absPath);
+    // Skip files whose content matches what we recorded after the last sync.
+    // Prevents the loop where a webhook-triggered pull writes a file, the same
+    // workflow run pushes it back unchanged, Notion sees an "edit", another
+    // webhook fires, etc. Only files the developer actually edited get pushed.
+    if (parsed.notionId) {
+      const recorded = state.entries[parsed.notionId];
+      const currentHash = hashContent(await readFile(file.absPath, 'utf-8'));
+      if (recorded && recorded.contentHash === currentHash) {
+        log(`  unchanged, skip: ${file.relPath}`);
+        result.skipped += 1;
+        continue;
+      }
+    }
     if (file.mapping.type === 'database') {
       await pushDatabaseRow(opts, file, parsed, state, result, log);
     } else {
