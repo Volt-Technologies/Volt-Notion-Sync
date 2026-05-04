@@ -211,12 +211,11 @@ export async function pageBlocksToMarkdown(client: Client, pageId: string): Prom
   return await renderBlocks(client, blocks, { client, indent: '', numberedCounter: [] });
 }
 
-export function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80) || 'untitled';
+export function slugify(name: string, opts: { preserveCase?: boolean } = {}): string {
+  const stripped = name.normalize('NFKD').replace(/[̀-ͯ]/g, '');
+  const cased = opts.preserveCase ? stripped : stripped.toLowerCase();
+  const charset = opts.preserveCase ? /[^A-Za-z0-9]+/g : /[^a-z0-9]+/g;
+  return (
+    cased.replace(charset, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'untitled'
+  );
 }

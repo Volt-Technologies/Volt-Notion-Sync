@@ -39,12 +39,14 @@ export async function push(opts: PushOptions): Promise<PushResult> {
   const pushable = opts.mappings.filter((m) => m.resolvedDirection !== 'pull');
   const files = await listLocalFiles(opts.repoRoot, pushable, opts.config.localIgnore);
 
+  // Order matters: rows / top-level pages first, then nested children by
+  // increasing depth. A child page's parent must already exist (and have
+  // a notion_id written back into its frontmatter) before we push the child.
+  files.sort((a, b) => fileDepth(a) - fileDepth(b));
+
   for (const file of files) {
     const parsed = await parseMarkdownFile(file.absPath);
     // Skip files whose content matches what we recorded after the last sync.
-    // Prevents the loop where a webhook-triggered pull writes a file, the same
-    // workflow run pushes it back unchanged, Notion sees an "edit", another
-    // webhook fires, etc. Only files the developer actually edited get pushed.
     if (parsed.notionId) {
       const recorded = state.entries[parsed.notionId];
       const currentHash = hashContent(await readFile(file.absPath, 'utf-8'));
@@ -54,8 +56,13 @@ export async function push(opts: PushOptions): Promise<PushResult> {
         continue;
       }
     }
+    const depth = fileDepth(file);
     if (file.mapping.type === 'database') {
-      await pushDatabaseRow(opts, file, parsed, state, result, log);
+      if (depth === 1) {
+        await pushDatabaseRow(opts, file, parsed, state, result, log);
+      } else {
+        await pushRowChildPage(opts, file, parsed, state, result, log);
+      }
     } else {
       await pushPage(opts, file, parsed, state, result, log);
     }
@@ -64,6 +71,15 @@ export async function push(opts: PushOptions): Promise<PushResult> {
   state.lastPushAt = new Date().toISOString();
   await saveState(opts.repoRoot, state);
   return result;
+}
+
+// Depth of `file.relPath` relative to its mapping. A file directly inside
+// the mapping folder is depth 1; one sub-directory deeper is 2; etc. Used
+// to distinguish database rows (1) from row child pages (>=2).
+function fileDepth(file: LocalFile): number {
+  const mappingPrefix = file.mapping.local.replace(/\\/g, '/').replace(/\/$/, '') + '/';
+  const tail = file.relPath.startsWith(mappingPrefix) ? file.relPath.slice(mappingPrefix.length) : file.relPath;
+  return tail.split('/').length;
 }
 
 async function pushPage(
@@ -153,6 +169,69 @@ async function pushDatabaseRow(
     log(`  row created: ${file.relPath} → ${created.id} (${blocks.length} blocks)`);
     state.entries[created.id] = {
       notionId: created.id,
+      localPath: file.relPath,
+      notionLastEditedTime: new Date().toISOString(),
+      contentHash: hashContent(await readFile(file.absPath, 'utf-8')),
+    };
+  }
+}
+
+// Pushes a row child page. The parent is identified by a sibling
+// "<dir>.md" file at the directory above this one — read its notion_id
+// from frontmatter (which the parent's own push step has already written
+// back if it was newly created). Child pages have no DB properties, only
+// a title; they're regular pages whose parent is another page.
+async function pushRowChildPage(
+  opts: PushOptions,
+  file: LocalFile,
+  parsed: Awaited<ReturnType<typeof parseMarkdownFile>>,
+  state: SyncState,
+  result: PushResult,
+  log: (m: string) => void,
+): Promise<void> {
+  const parentFile = path.join(path.dirname(file.absPath) + '.md');
+  let parentId: string | null = null;
+  try {
+    const parentParsed = await parseMarkdownFile(parentFile);
+    parentId = parentParsed.notionId ?? null;
+  } catch {
+    // Parent file missing — the child is orphaned in the local mirror.
+  }
+  if (!parentId) {
+    log(`  skip ${file.relPath}: parent ${path.relative(opts.repoRoot, parentFile)} has no notion_id`);
+    result.skipped += 1;
+    return;
+  }
+
+  const blocks = markdownToBlocks(parsed.body);
+  const title = parsed.title || path.basename(file.absPath, '.md');
+
+  if (parsed.notionId) {
+    await replacePageBlocks(opts.client, parsed.notionId, blocks);
+    await opts.client.pages.update({
+      page_id: parsed.notionId,
+      properties: titleProperty(title) as never,
+    });
+    result.pagesUpdated += 1;
+    log(`  child updated: ${file.relPath} (${blocks.length} blocks)`);
+    state.entries[parsed.notionId] = {
+      notionId: parsed.notionId,
+      localPath: file.relPath,
+      notionLastEditedTime: new Date().toISOString(),
+      contentHash: hashContent(await readFile(file.absPath, 'utf-8')),
+    };
+  } else {
+    const created = await opts.client.pages.create({
+      parent: { page_id: parentId },
+      properties: titleProperty(title) as never,
+      children: blocks as never,
+    });
+    const newId = (created as { id: string }).id;
+    await writeBackId(file.absPath, newId, (created as { url?: string }).url ?? '');
+    result.pagesCreated += 1;
+    log(`  child created: ${file.relPath} → ${newId} (${blocks.length} blocks)`);
+    state.entries[newId] = {
+      notionId: newId,
       localPath: file.relPath,
       notionLastEditedTime: new Date().toISOString(),
       contentHash: hashContent(await readFile(file.absPath, 'utf-8')),

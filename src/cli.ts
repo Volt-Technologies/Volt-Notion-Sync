@@ -8,6 +8,7 @@ import { createNotionClient } from './notion/client.js';
 import { resolveMappings, inspectRoot } from './mapping/resolve.js';
 import { pull } from './sync/pull.js';
 import { push } from './sync/push.js';
+import { bootstrap, renderMappingsYaml } from './bootstrap/run.js';
 import type { Config, ResolvedMapping } from './config/types.js';
 
 const program = new Command();
@@ -114,6 +115,28 @@ program
       }
     }
     console.log(JSON.stringify({ direct, pr }, null, 2));
+  });
+
+program
+  .command('bootstrap')
+  .description(
+    'Build the Volt project template under a starter page (Project Home + 14 databases + relations + 3 resource pages + 5 waterfall sub-pages)',
+  )
+  .argument('<starter-page-id>', 'Notion page id under which to create Project Home (must already be shared with the integration)')
+  .option('--token <token>', 'Notion integration token (defaults to $NOTION_TOKEN)')
+  .action(async (starterPageId: string, opts: { token?: string }) => {
+    const token = opts.token || process.env.NOTION_TOKEN;
+    if (!token) die('NOTION_TOKEN is required (env var or --token)');
+    const client = createNotionClient({ token });
+    const result = await bootstrap({
+      client,
+      starterPageId,
+      log: (m) => console.log(m),
+    });
+    console.log('\n✓ Bootstrap complete.');
+    console.log(`Project Home id: ${result.projectHomeId}`);
+    console.log('\nPaste this into .volt/.volt-sync.yml:\n');
+    console.log(renderMappingsYaml(result));
   });
 
 program

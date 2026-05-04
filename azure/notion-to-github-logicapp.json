@@ -1,0 +1,167 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "githubToken": {
+        "type": "SecureString",
+        "defaultValue": "",
+        "metadata": {
+          "description": "GitHub PAT (or GitHub App installation token) with repo + workflow scope. Leave empty here and set in the Parameters blade."
+        }
+      },
+      "dispatchEventType": {
+        "type": "String",
+        "defaultValue": "notion-changed",
+        "metadata": {
+          "description": "Value for 'event_type' on repository_dispatch. Volt convention is `notion-changed`."
+        }
+      },
+      "repoMapping": {
+        "type": "Object",
+        "defaultValue": {
+          "7be00f55-e972-815f-b2ca-0003fe09040b": {
+            "owner": "grvolttechnologies",
+            "repo": "DummyProject"
+          }
+        },
+        "metadata": {
+          "description": "Map: Notion workspace_id → { owner, repo }. Add one entry per customer project. To key by parent database instead of workspace, change `mappingKey` action below to read `triggerBody()?['data']?['parent']?['data_source_id']`."
+        }
+      }
+    },
+    "triggers": {
+      "When_Notion_posts_a_webhook": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "verification_token": { "type": "string" },
+              "type":               { "type": "string" },
+              "id":                 { "type": "string" },
+              "timestamp":          { "type": "string" },
+              "workspace_id":       { "type": "string" },
+              "subscription_id":    { "type": "string" },
+              "integration_id":     { "type": "string" },
+              "authors":            { "type": "array" },
+              "accessible_by":      { "type": "array" },
+              "attempt_number":     { "type": "integer" },
+              "entity":             { "type": "object" },
+              "data":               { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "actions": {
+      "Is_verification_request": {
+        "type": "If",
+        "expression": {
+          "and": [
+            {
+              "not": {
+                "equals": [
+                  "@triggerBody()?['verification_token']",
+                  "@null"
+                ]
+              }
+            }
+          ]
+        },
+        "actions": {
+          "Respond_to_verification": {
+            "type": "Response",
+            "kind": "Http",
+            "inputs": {
+              "statusCode": 200,
+              "headers": { "Content-Type": "application/json" },
+              "body": {
+                "received_verification_token": "@triggerBody()?['verification_token']",
+                "note": "Copy this token into Notion's integration UI to complete subscription setup."
+              }
+            }
+          }
+        },
+        "else": {
+          "actions": {
+            "Acknowledge_to_Notion": {
+              "type": "Response",
+              "kind": "Http",
+              "inputs": {
+                "statusCode": 200,
+                "body": { "ok": true }
+              },
+              "runAfter": {}
+            },
+            "mappingKey": {
+              "type": "Compose",
+              "inputs": "@triggerBody()?['workspace_id']",
+              "runAfter": { "Acknowledge_to_Notion": [ "Succeeded" ] }
+            },
+            "Resolve_target_repo": {
+              "type": "Compose",
+              "inputs": "@parameters('repoMapping')?[outputs('mappingKey')]",
+              "runAfter": { "mappingKey": [ "Succeeded" ] }
+            },
+            "Has_mapping": {
+              "type": "If",
+              "expression": {
+                "and": [
+                  {
+                    "not": {
+                      "equals": [ "@outputs('Resolve_target_repo')", "@null" ]
+                    }
+                  }
+                ]
+              },
+              "actions": {
+                "Trigger_GitHub_repository_dispatch": {
+                  "type": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "uri": "@{concat('https://api.github.com/repos/', outputs('Resolve_target_repo')['owner'], '/', outputs('Resolve_target_repo')['repo'], '/dispatches')}",
+                    "headers": {
+                      "Accept": "application/vnd.github+json",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "Authorization": "@{concat('Bearer ', parameters('githubToken'))}",
+                      "User-Agent": "azure-logic-app-notion-bridge"
+                    },
+                    "body": {
+                      "event_type": "@parameters('dispatchEventType')",
+                      "client_payload": {
+                        "notion_event_id":   "@triggerBody()?['id']",
+                        "notion_event_type": "@triggerBody()?['type']",
+                        "timestamp":         "@triggerBody()?['timestamp']",
+                        "workspace_id":      "@triggerBody()?['workspace_id']",
+                        "entity":            "@triggerBody()?['entity']",
+                        "data":              "@triggerBody()?['data']"
+                      }
+                    }
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Log_unmapped_key": {
+                    "type": "Compose",
+                    "inputs": "@{concat('No repoMapping entry for key: ', string(outputs('mappingKey')), '. Notion event ', triggerBody()?['id'], ' was acknowledged but not dispatched.')}"
+                  }
+                }
+              },
+              "runAfter": { "Resolve_target_repo": [ "Succeeded" ] }
+            }
+          }
+        },
+        "runAfter": {}
+      }
+    },
+    "outputs": {}
+  },
+  "parameters": {
+    "githubToken": {
+      "value": "REPLACE_WITH_NEW_PAT_AFTER_ROTATING"
+    }
+  }
+}

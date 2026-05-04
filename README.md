@@ -234,6 +234,94 @@ Compared to a 15-min cron that runs ~2,880 times/month per repo regardless of ac
 - **AL code blocks** map to Notion's `plain text` language because `al` isn't in Notion's supported list — the code is preserved, just no syntax highlighting.
 - **Image/file/video attachments** are kept as URLs to Notion's CDN. Local download into `<mapping>/.attachments` is a future enhancement.
 
+## Alternative receiver: Azure Logic App
+
+If you don't want to host the `Volt-Consulting-Platform/api` receiver, an Azure Logic App (Consumption) can play the same role: terminate the Notion webhook, route by Notion ID to a target repo, and fire `repository_dispatch`. The full template lives at `azure/notion-to-github-logicapp.json`.
+
+### When to use this vs the platform receiver
+
+| | Platform receiver | Azure Logic App |
+|---|---|---|
+| HMAC signature verification | yes (Express `verify` callback) | no — relies on the SAS `sig` in the trigger URL |
+| Debounce | 60s in-memory per project | none (rely on workflow's `concurrency` group) |
+| Mapping storage | Project record in DB | JSON parameter on the workflow itself |
+| Auth to GitHub | Org-level PAT | PAT (PoC) or GitHub App installation token (prod) |
+| Best for | Centralised SaaS deployment | Self-hosted / per-customer Azure tenant |
+
+### Architecture
+
+```
+┌──────────┐     POST     ┌────────────────────────┐  repository_dispatch   ┌─────────────────────┐
+│  Notion  │ ───────────▶ │  Azure Logic App        │ ─────────────────────▶ │ GitHub Actions       │
+│ webhook  │              │  (Consumption)          │                        │ in mapped repo       │
+│          │              │  - verify handshake     │                        │ (volt-notion-sync)   │
+│          │              │  - lookup repo by id    │                        │                      │
+└──────────┘              │  - dispatch via PAT/App │                        └─────────────────────┘
+                          └────────────────────────┘
+```
+
+The Logic App has one trigger (**When a HTTP request is received**) and a top‑level `If` that splits two flows:
+
+1. **Verification handshake.** First Notion POST contains a `verification_token` field. The Logic App echoes it back in the response body so you can read it from the run history and paste it into Notion's webhook setup form. Notion's webhook configuration is UI‑only — there is no REST API to create subscriptions.
+2. **Real events.** Acknowledge to Notion with 200 immediately, then look up the target repo and call `POST /repos/{owner}/{repo}/dispatches` with `event_type: "notion-changed"` and a `client_payload` carrying the original Notion event.
+
+### Deployment
+
+1. **Rotate any PAT that's been pasted in chat / commits / issues** — GitHub's secret scanner auto-revokes leaked tokens, so debugging "Bad credentials" is usually about an already-dead PAT.
+2. Generate a new classic PAT with `repo` + `workflow` scopes (or, for production, set up a GitHub App — see below).
+3. In the Azure portal, create a new **Logic App (Consumption)**. Open **Logic app code view** and paste the inner `definition` block from `azure/notion-to-github-logicapp.json` (the outer `parameters` wrapper is for ARM deployment, not Code view).
+4. Save. The validator will accept it because `githubToken` has `defaultValue: ""`. Now open the **`{ } Parameters`** blade and set:
+   - `githubToken` — the new PAT.
+   - `repoMapping` — JSON object keyed by Notion ID → `{ owner, repo }` (see below).
+   - `dispatchEventType` — leave as `notion-changed` (must match the workflow's `repository_dispatch: types: [...]`).
+5. Save the parameters, then save the workflow.
+6. Open the trigger card → copy the **HTTP POST URL** (includes a SAS `sig` query param — treat as a secret).
+7. In Notion's integration dashboard, paste that URL as the webhook endpoint. Notion fires a verification POST → check the Logic App run history → the run output contains the verification token → paste it back into Notion's UI.
+
+### Mapping pattern
+
+The mapping is stored as a workflow parameter (no external DB, no extra Notion API calls). Default keys by `workspace_id`:
+
+```json
+{
+  "<notion-workspace-id>":  { "owner": "grvolttechnologies", "repo": "CustomerA" },
+  "<other-workspace-id>":   { "owner": "grvolttechnologies", "repo": "CustomerB" }
+}
+```
+
+The lookup happens in two Compose actions:
+
+- `mappingKey` — picks which payload field to key on. Default: `@triggerBody()?['workspace_id']`.
+- `Resolve_target_repo` — `@parameters('repoMapping')?[outputs('mappingKey')]`. Returns null on miss; the `Has_mapping` `If` action branches on null and either dispatches or logs the unmapped key.
+
+If multiple customer projects share one Notion workspace, swap `mappingKey` to a more granular field (no other change needed):
+
+- `@triggerBody()?['data']?['parent']?['data_source_id']` — the database the changed page lives in. Each Volt Quickstart database has a unique ID, so each customer needs ~8 mapping entries (one per database) all pointing to the same repo.
+- `@triggerBody()?['data']?['parent']?['id']` — parent ID, similar shape.
+- A composite key built with `concat(...)` if you need multi-part discrimination.
+
+Onboarding a new customer = edit the `repoMapping` parameter value in the portal and save. No code change.
+
+### Gotchas worth flagging
+
+- **`event_type` must match the workflow exactly.** Volt convention is `notion-changed`. A Logic App sending `notion-event` (or any other string) returns 204 from GitHub but fires no Action — the dispatch lands in a void.
+- **The workflow file must live on the repo's default branch.** `repository_dispatch` only triggers workflows that exist on `main` (or whatever the default is). A workflow on a feature branch produces 204 + no run.
+- **Authorization header value** in the run inputs is masked as `*sanitized*` for SecureString parameters — that's expected, not a bug. To debug 401s, run `curl -H "Authorization: Bearer $pat" https://api.github.com/user` from your terminal.
+- **`Bad credentials` (401)** with a fresh-looking PAT almost always means: token was auto-revoked (leaked), wrong scopes (need full `repo`, not `public_repo`), pasted with trailing whitespace from clipboard, or — for org repos — never SSO-authorized.
+
+### Production hardening: GitHub App instead of PAT
+
+PATs are tied to one user, expire, may be disallowed by org policy, and need SSO re-authorization. For multi-customer deployments, replace `githubToken` with a GitHub App installation token generated per dispatch:
+
+1. Create a GitHub App. Permissions: `Actions: Read & write`, `Contents: Read & write`, `Metadata: Read`. Install on each target repo.
+2. Store the App's private key (PEM) in **Azure Key Vault**.
+3. Add two actions to the Logic App before the dispatch HTTP call:
+   - **Generate JWT** (RS256, `iss = appId`, `iat = now`, `exp = now + 9min`). Easiest implementation: an Azure Function (Node, ~10 lines using `jsonwebtoken`) called from the Logic App.
+   - **Exchange JWT for installation token** — `POST https://api.github.com/app/installations/{installation_id}/access_tokens` with `Authorization: Bearer <JWT>`. Response gives a 60-min token.
+4. Use that token as the `Authorization: Bearer` value on `/dispatches`.
+
+The `installation_id` per repo can live in the same `repoMapping` JSON (`{ "<key>": { "owner": "...", "repo": "...", "installationId": 12345 } }`) so onboarding stays a single parameter edit.
+
 ## Repo layout
 
 ```

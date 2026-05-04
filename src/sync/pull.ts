@@ -10,6 +10,7 @@ import { isIgnoredNotion } from '../mapping/glob.js';
 import { hashContent, loadState, saveState, type SyncState } from './state.js';
 import { detectConflicts, applyConflictPolicy, formatConflicts, type Conflict } from './conflict.js';
 
+
 export interface PullOptions {
   client: Client;
   repoRoot: string;
@@ -106,7 +107,7 @@ async function pullPageTree(
     const isRootOfMapping = node.id === mapping.resolvedNotionId;
     const relSegments = isRootOfMapping
       ? ['index']
-      : [...node.parentPath.slice(1).map(slugify), slugify(node.title), 'index'];
+      : [...node.parentPath.slice(1).map((s) => slugify(s)), slugify(node.title), 'index'];
     const fileRel = path.posix.join(mapping.local, ...relSegments) + '.md';
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
 
@@ -157,7 +158,8 @@ async function pullDatabase(
   for (const row of exp.rows) {
     if (isIgnoredNotion([row.title], opts.config.notionIgnore)) continue;
     if (skipIds.has(row.id)) continue;
-    const fileRel = path.posix.join(mapping.local, slugify(row.title || row.id) + '.md');
+    const rowSlug = slugify(row.title || row.id);
+    const fileRel = path.posix.join(mapping.local, rowSlug + '.md');
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
     const body = await pageBlocksToMarkdown(opts.client, row.id);
     const content = renderRowMarkdown(opts.config, row, exp, body);
@@ -171,9 +173,92 @@ async function pullDatabase(
       contentHash: hashContent(content),
     };
     rowsWritten += 1;
+
+    // Recursively pull any child pages of this row. Each becomes a nested
+    // markdown file beside the row at projectmanagement/<db>/<row-slug>/...
+    // Skips the row itself (it's already written above).
+    const childPagesWritten = await pullRowChildPages(
+      opts,
+      mapping,
+      row,
+      rowSlug,
+      state,
+      writtenPaths,
+      skipIds,
+    );
+    if (childPagesWritten > 0) {
+      log(`    + ${childPagesWritten} child page(s) under ${rowSlug}/`);
+    }
   }
   log(`  database rows: ${rowsWritten}`);
   return { rowsWritten };
+}
+
+async function pullRowChildPages(
+  opts: PullOptions,
+  mapping: ResolvedMapping,
+  row: NormalizedRow,
+  rowSlug: string,
+  state: SyncState,
+  writtenPaths: Set<string>,
+  skipIds: Set<string>,
+): Promise<number> {
+  const tree = await walkPageTree(opts.client, row.id, {
+    shouldDescend: (node) => !isIgnoredNotion([...node.parentPath, node.title], opts.config.notionIgnore),
+  });
+  // First entry is the row itself; skip it.
+  const descendants = tree.slice(1);
+
+  let written = 0;
+  for (const node of descendants) {
+    if (isIgnoredNotion([...node.parentPath, node.title], opts.config.notionIgnore)) continue;
+    if (skipIds.has(node.id)) continue;
+
+    // node.parentPath[0] is the row title; everything between is intermediate
+    // directories that the file should land under, plus the node's own slug.
+    // preserveCase keeps acronyms like "FDD"/"TDD" intact in the filename and
+    // lets users name a sub-page literally "test-report" to land it as-is.
+    const intermediate = node.parentPath.slice(1).map((s) => slugify(s, { preserveCase: true }));
+    const fileRel = path.posix.join(
+      mapping.local,
+      rowSlug,
+      ...intermediate,
+      slugify(node.title, { preserveCase: true }) + '.md',
+    );
+    const filePath = path.join(opts.repoRoot, '.volt', fileRel);
+
+    const body = await pageBlocksToMarkdown(opts.client, node.id);
+    const content = renderChildPageMarkdown(opts.config, node, row.id, body);
+    await writeFileEnsured(filePath, content);
+    writtenPaths.add(path.normalize(filePath));
+
+    state.entries[node.id] = {
+      notionId: node.id,
+      localPath: fileRel,
+      notionLastEditedTime: node.lastEditedTime,
+      contentHash: hashContent(content),
+    };
+    written += 1;
+  }
+  return written;
+}
+
+function renderChildPageMarkdown(
+  config: Config,
+  node: NotionPageNode,
+  rowId: string,
+  body: string,
+): string {
+  const trimmed = body.trim();
+  if (!config.markdown.frontmatter) return `# ${node.title}\n\n${trimmed}\n`;
+  const fm = {
+    notion_id: node.id,
+    notion_url: node.url,
+    last_edited_time: node.lastEditedTime,
+    title: node.title,
+    parent_row_id: rowId,
+  };
+  return `---\n${YAML.stringify(fm).trimEnd()}\n---\n\n# ${node.title}\n\n${trimmed}\n`;
 }
 
 function renderMarkdownFile(config: Config, node: NotionPageNode, body: string): string {

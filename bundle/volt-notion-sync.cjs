@@ -2932,7 +2932,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {(string | Function)} text - string to add, or a function returning a string
        * @return {Command} `this` command for chaining
        */
-      addHelpText(position, text) {
+      addHelpText(position, text2) {
         const allowedValues = ["beforeAll", "before", "after", "afterAll"];
         if (!allowedValues.includes(position)) {
           throw new Error(`Unexpected value for position to addHelpText.
@@ -2941,10 +2941,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
         const helpEvent = `${position}Help`;
         this.on(helpEvent, (context) => {
           let helpStr;
-          if (typeof text === "function") {
-            helpStr = text({ error: context.error, command: context.command });
+          if (typeof text2 === "function") {
+            helpStr = text2({ error: context.error, command: context.command });
           } else {
-            helpStr = text;
+            helpStr = text2;
           }
           if (helpStr) {
             context.write(`${helpStr}
@@ -3986,14 +3986,14 @@ var require_foldFlowLines = __commonJS({
     var FOLD_FLOW = "flow";
     var FOLD_BLOCK = "block";
     var FOLD_QUOTED = "quoted";
-    function foldFlowLines(text, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
+    function foldFlowLines(text2, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
       if (!lineWidth || lineWidth < 0)
-        return text;
+        return text2;
       if (lineWidth < minContentWidth)
         minContentWidth = 0;
       const endStep = Math.max(1 + minContentWidth, 1 + lineWidth - indent.length);
-      if (text.length <= endStep)
-        return text;
+      if (text2.length <= endStep)
+        return text2;
       const folds = [];
       const escapedFolds = {};
       let end = lineWidth - indent.length;
@@ -4010,14 +4010,14 @@ var require_foldFlowLines = __commonJS({
       let escStart = -1;
       let escEnd = -1;
       if (mode === FOLD_BLOCK) {
-        i = consumeMoreIndentedLines(text, i, indent.length);
+        i = consumeMoreIndentedLines(text2, i, indent.length);
         if (i !== -1)
           end = i + endStep;
       }
-      for (let ch; ch = text[i += 1]; ) {
+      for (let ch; ch = text2[i += 1]; ) {
         if (mode === FOLD_QUOTED && ch === "\\") {
           escStart = i;
-          switch (text[i + 1]) {
+          switch (text2[i + 1]) {
             case "x":
               i += 3;
               break;
@@ -4034,12 +4034,12 @@ var require_foldFlowLines = __commonJS({
         }
         if (ch === "\n") {
           if (mode === FOLD_BLOCK)
-            i = consumeMoreIndentedLines(text, i, indent.length);
+            i = consumeMoreIndentedLines(text2, i, indent.length);
           end = i + indent.length + endStep;
           split = void 0;
         } else {
           if (ch === " " && prev && prev !== " " && prev !== "\n" && prev !== "	") {
-            const next = text[i + 1];
+            const next = text2[i + 1];
             if (next && next !== " " && next !== "\n" && next !== "	")
               split = i;
           }
@@ -4051,12 +4051,12 @@ var require_foldFlowLines = __commonJS({
             } else if (mode === FOLD_QUOTED) {
               while (prev === " " || prev === "	") {
                 prev = ch;
-                ch = text[i += 1];
+                ch = text2[i += 1];
                 overflow = true;
               }
               const j = i > escEnd + 1 ? i - 2 : escStart - 1;
               if (escapedFolds[j])
-                return text;
+                return text2;
               folds.push(j);
               escapedFolds[j] = true;
               end = j + endStep;
@@ -4071,39 +4071,39 @@ var require_foldFlowLines = __commonJS({
       if (overflow && onOverflow)
         onOverflow();
       if (folds.length === 0)
-        return text;
+        return text2;
       if (onFold)
         onFold();
-      let res = text.slice(0, folds[0]);
+      let res = text2.slice(0, folds[0]);
       for (let i2 = 0; i2 < folds.length; ++i2) {
         const fold = folds[i2];
-        const end2 = folds[i2 + 1] || text.length;
+        const end2 = folds[i2 + 1] || text2.length;
         if (fold === 0)
           res = `
-${indent}${text.slice(0, end2)}`;
+${indent}${text2.slice(0, end2)}`;
         else {
           if (mode === FOLD_QUOTED && escapedFolds[fold])
-            res += `${text[fold]}\\`;
+            res += `${text2[fold]}\\`;
           res += `
-${indent}${text.slice(fold + 1, end2)}`;
+${indent}${text2.slice(fold + 1, end2)}`;
         }
       }
       return res;
     }
-    function consumeMoreIndentedLines(text, i, indent) {
+    function consumeMoreIndentedLines(text2, i, indent) {
       let end = i;
       let start = i + 1;
-      let ch = text[start];
+      let ch = text2[start];
       while (ch === " " || ch === "	") {
         if (i < start + indent) {
-          ch = text[++i];
+          ch = text2[++i];
         } else {
           do {
-            ch = text[++i];
+            ch = text2[++i];
           } while (ch && ch !== "\n");
           end = i;
           start = i + 1;
-          ch = text[start];
+          ch = text2[start];
         }
       }
       return end;
@@ -14791,12 +14791,12 @@ var require_mark = __commonJS({
   "node_modules/js-yaml/lib/js-yaml/mark.js"(exports2, module2) {
     "use strict";
     var common = require_common();
-    function Mark(name, buffer, position, line, column) {
+    function Mark(name, buffer, position, line, column2) {
       this.name = name;
       this.buffer = buffer;
       this.position = position;
       this.line = line;
-      this.column = column;
+      this.column = column2;
     }
     Mark.prototype.getSnippet = function getSnippet(indent, maxLength) {
       var head, start, tail, end, snippet;
@@ -22266,8 +22266,8 @@ function extractPageTitle(properties) {
   if (!properties) return "Untitled";
   for (const prop of Object.values(properties)) {
     if (prop.type === "title" && Array.isArray(prop.title)) {
-      const text = prop.title.map((t) => t.plain_text ?? "").join("").trim();
-      if (text) return text;
+      const text2 = prop.title.map((t) => t.plain_text ?? "").join("").trim();
+      if (text2) return text2;
     }
   }
   return "Untitled";
@@ -22413,14 +22413,14 @@ var import_yaml2 = __toESM(require_dist(), 1);
 function renderRichText(rich) {
   if (!rich) return "";
   return rich.map((rt) => {
-    let text = rt.plain_text ?? "";
+    let text2 = rt.plain_text ?? "";
     const a = rt.annotations ?? {};
-    if (a.code) text = `\`${text}\``;
-    if (a.bold) text = `**${text}**`;
-    if (a.italic) text = `*${text}*`;
-    if (a.strikethrough) text = `~~${text}~~`;
-    if (rt.href) text = `[${text}](${rt.href})`;
-    return text;
+    if (a.code) text2 = `\`${text2}\``;
+    if (a.bold) text2 = `**${text2}**`;
+    if (a.italic) text2 = `*${text2}*`;
+    if (a.strikethrough) text2 = `~~${text2}~~`;
+    if (rt.href) text2 = `[${text2}](${rt.href})`;
+    return text2;
   }).join("");
 }
 async function renderChildren(client, parentId, ctx) {
@@ -22431,8 +22431,8 @@ async function renderBlock(client, block2, ctx) {
   const indent = ctx.indent;
   switch (block2.type) {
     case "paragraph": {
-      const text = renderRichText(block2.paragraph?.rich_text);
-      return text ? `${indent}${text}
+      const text2 = renderRichText(block2.paragraph?.rich_text);
+      return text2 ? `${indent}${text2}
 ` : "\n";
     }
     case "heading_1":
@@ -22498,9 +22498,9 @@ ${indent}</details>
     }
     case "code": {
       const lang = block2.code?.language ?? "";
-      const text = renderRichText(block2.code?.rich_text);
+      const text2 = renderRichText(block2.code?.rich_text);
       return `${indent}\`\`\`${lang}
-${text}
+${text2}
 ${indent}\`\`\`
 `;
     }
@@ -22581,8 +22581,11 @@ async function pageBlocksToMarkdown(client, pageId) {
   const blocks = await listChildBlocks(client, pageId);
   return await renderBlocks(client, blocks, { client, indent: "", numberedCounter: [] });
 }
-function slugify(name) {
-  return name.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "untitled";
+function slugify(name, opts = {}) {
+  const stripped = name.normalize("NFKD").replace(/[̀-ͯ]/g, "");
+  const cased = opts.preserveCase ? stripped : stripped.toLowerCase();
+  const charset = opts.preserveCase ? /[^A-Za-z0-9]+/g : /[^a-z0-9]+/g;
+  return cased.replace(charset, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "untitled";
 }
 
 // src/notion/database.ts
@@ -22828,7 +22831,7 @@ function expand_(str2, max, isTop) {
         }
       }
     }
-    let N;
+    let N2;
     if (isSequence && n[0] !== void 0 && n[1] !== void 0) {
       const x = numeric(n[0]);
       const y = numeric(n[1]);
@@ -22841,7 +22844,7 @@ function expand_(str2, max, isTop) {
         test = gte;
       }
       const pad = n.some(isPadded);
-      N = [];
+      N2 = [];
       for (let i = x; test(i, y); i += incr) {
         let c;
         if (isAlphaSequence) {
@@ -22863,17 +22866,17 @@ function expand_(str2, max, isTop) {
             }
           }
         }
-        N.push(c);
+        N2.push(c);
       }
     } else {
-      N = [];
+      N2 = [];
       for (let j = 0; j < n.length; j++) {
-        N.push.apply(N, expand_(n[j], max, false));
+        N2.push.apply(N2, expand_(n[j], max, false));
       }
     }
-    for (let j = 0; j < N.length; j++) {
+    for (let j = 0; j < N2.length; j++) {
       for (let k = 0; k < post.length && expansions.length < max; k++) {
-        const expansion = pre + N[j] + post[k];
+        const expansion = pre + N2[j] + post[k];
         if (!isTop || isSequence || expansion) {
           expansions.push(expansion);
         }
@@ -24626,7 +24629,7 @@ async function pullPageTree(opts, mapping, state, writtenPaths, skipIds) {
     if (isIgnoredNotion(fullPath, opts.config.notionIgnore)) continue;
     if (skipIds.has(node.id)) continue;
     const isRootOfMapping = node.id === mapping.resolvedNotionId;
-    const relSegments = isRootOfMapping ? ["index"] : [...node.parentPath.slice(1).map(slugify), slugify(node.title), "index"];
+    const relSegments = isRootOfMapping ? ["index"] : [...node.parentPath.slice(1).map((s) => slugify(s)), slugify(node.title), "index"];
     const fileRel = import_node_path3.default.posix.join(mapping.local, ...relSegments) + ".md";
     const filePath = import_node_path3.default.join(opts.repoRoot, ".volt", fileRel);
     const md = await pageBlocksToMarkdown(opts.client, node.id);
@@ -24666,7 +24669,8 @@ async function pullDatabase(opts, mapping, state, writtenPaths, skipIds) {
   for (const row of exp.rows) {
     if (isIgnoredNotion([row.title], opts.config.notionIgnore)) continue;
     if (skipIds.has(row.id)) continue;
-    const fileRel = import_node_path3.default.posix.join(mapping.local, slugify(row.title || row.id) + ".md");
+    const rowSlug = slugify(row.title || row.id);
+    const fileRel = import_node_path3.default.posix.join(mapping.local, rowSlug + ".md");
     const filePath = import_node_path3.default.join(opts.repoRoot, ".volt", fileRel);
     const body = await pageBlocksToMarkdown(opts.client, row.id);
     const content = renderRowMarkdown(opts.config, row, exp, body);
@@ -24679,9 +24683,74 @@ async function pullDatabase(opts, mapping, state, writtenPaths, skipIds) {
       contentHash: hashContent(content)
     };
     rowsWritten += 1;
+    const childPagesWritten = await pullRowChildPages(
+      opts,
+      mapping,
+      row,
+      rowSlug,
+      state,
+      writtenPaths,
+      skipIds
+    );
+    if (childPagesWritten > 0) {
+      log(`    + ${childPagesWritten} child page(s) under ${rowSlug}/`);
+    }
   }
   log(`  database rows: ${rowsWritten}`);
   return { rowsWritten };
+}
+async function pullRowChildPages(opts, mapping, row, rowSlug, state, writtenPaths, skipIds) {
+  const tree = await walkPageTree(opts.client, row.id, {
+    shouldDescend: (node) => !isIgnoredNotion([...node.parentPath, node.title], opts.config.notionIgnore)
+  });
+  const descendants = tree.slice(1);
+  let written = 0;
+  for (const node of descendants) {
+    if (isIgnoredNotion([...node.parentPath, node.title], opts.config.notionIgnore)) continue;
+    if (skipIds.has(node.id)) continue;
+    const intermediate = node.parentPath.slice(1).map((s) => slugify(s, { preserveCase: true }));
+    const fileRel = import_node_path3.default.posix.join(
+      mapping.local,
+      rowSlug,
+      ...intermediate,
+      slugify(node.title, { preserveCase: true }) + ".md"
+    );
+    const filePath = import_node_path3.default.join(opts.repoRoot, ".volt", fileRel);
+    const body = await pageBlocksToMarkdown(opts.client, node.id);
+    const content = renderChildPageMarkdown(opts.config, node, row.id, body);
+    await writeFileEnsured(filePath, content);
+    writtenPaths.add(import_node_path3.default.normalize(filePath));
+    state.entries[node.id] = {
+      notionId: node.id,
+      localPath: fileRel,
+      notionLastEditedTime: node.lastEditedTime,
+      contentHash: hashContent(content)
+    };
+    written += 1;
+  }
+  return written;
+}
+function renderChildPageMarkdown(config, node, rowId, body) {
+  const trimmed = body.trim();
+  if (!config.markdown.frontmatter) return `# ${node.title}
+
+${trimmed}
+`;
+  const fm = {
+    notion_id: node.id,
+    notion_url: node.url,
+    last_edited_time: node.lastEditedTime,
+    title: node.title,
+    parent_row_id: rowId
+  };
+  return `---
+${import_yaml2.default.stringify(fm).trimEnd()}
+---
+
+# ${node.title}
+
+${trimmed}
+`;
 }
 function renderMarkdownFile(config, node, body) {
   if (!config.markdown.frontmatter) return body;
@@ -25166,26 +25235,26 @@ function findClosingBracket(str2, b) {
 function outputLink(cap, link2, raw, lexer2, rules) {
   const href = link2.href;
   const title = link2.title || null;
-  const text = cap[1].replace(rules.other.outputLinkReplace, "$1");
+  const text2 = cap[1].replace(rules.other.outputLinkReplace, "$1");
   lexer2.state.inLink = true;
   const token = {
     type: cap[0].charAt(0) === "!" ? "image" : "link",
     raw,
     href,
     title,
-    text,
-    tokens: lexer2.inlineTokens(text)
+    text: text2,
+    tokens: lexer2.inlineTokens(text2)
   };
   lexer2.state.inLink = false;
   return token;
 }
-function indentCodeCompensation(raw, text, rules) {
+function indentCodeCompensation(raw, text2, rules) {
   const matchIndentToCode = raw.match(rules.other.indentCodeCompensation);
   if (matchIndentToCode === null) {
-    return text;
+    return text2;
   }
   const indentToCode = matchIndentToCode[1];
-  return text.split("\n").map((node) => {
+  return text2.split("\n").map((node) => {
     const matchIndentInNode = node.match(rules.other.beginningSpace);
     if (matchIndentInNode === null) {
       return node;
@@ -25218,12 +25287,12 @@ var _Tokenizer = class {
   code(src) {
     const cap = this.rules.block.code.exec(src);
     if (cap) {
-      const text = cap[0].replace(this.rules.other.codeRemoveIndent, "");
+      const text2 = cap[0].replace(this.rules.other.codeRemoveIndent, "");
       return {
         type: "code",
         raw: cap[0],
         codeBlockStyle: "indented",
-        text: !this.options.pedantic ? rtrim(text, "\n") : text
+        text: !this.options.pedantic ? rtrim(text2, "\n") : text2
       };
     }
   }
@@ -25231,33 +25300,33 @@ var _Tokenizer = class {
     const cap = this.rules.block.fences.exec(src);
     if (cap) {
       const raw = cap[0];
-      const text = indentCodeCompensation(raw, cap[3] || "", this.rules);
+      const text2 = indentCodeCompensation(raw, cap[3] || "", this.rules);
       return {
         type: "code",
         raw,
         lang: cap[2] ? cap[2].trim().replace(this.rules.inline.anyPunctuation, "$1") : cap[2],
-        text
+        text: text2
       };
     }
   }
   heading(src) {
     const cap = this.rules.block.heading.exec(src);
     if (cap) {
-      let text = cap[2].trim();
-      if (this.rules.other.endingHash.test(text)) {
-        const trimmed = rtrim(text, "#");
+      let text2 = cap[2].trim();
+      if (this.rules.other.endingHash.test(text2)) {
+        const trimmed = rtrim(text2, "#");
         if (this.options.pedantic) {
-          text = trimmed.trim();
+          text2 = trimmed.trim();
         } else if (!trimmed || this.rules.other.endingSpaceChar.test(trimmed)) {
-          text = trimmed.trim();
+          text2 = trimmed.trim();
         }
       }
       return {
         type: "heading",
         raw: cap[0],
         depth: cap[1].length,
-        text,
-        tokens: this.lexer.inline(text)
+        text: text2,
+        tokens: this.lexer.inline(text2)
       };
     }
   }
@@ -25275,7 +25344,7 @@ var _Tokenizer = class {
     if (cap) {
       let lines = rtrim(cap[0], "\n").split("\n");
       let raw = "";
-      let text = "";
+      let text2 = "";
       const tokens = [];
       while (lines.length > 0) {
         let inBlockquote = false;
@@ -25296,7 +25365,7 @@ var _Tokenizer = class {
         const currentText = currentRaw.replace(this.rules.other.blockquoteSetextReplace, "\n    $1").replace(this.rules.other.blockquoteSetextReplace2, "");
         raw = raw ? `${raw}
 ${currentRaw}` : currentRaw;
-        text = text ? `${text}
+        text2 = text2 ? `${text2}
 ${currentText}` : currentText;
         const top = this.lexer.state.top;
         this.lexer.state.top = true;
@@ -25314,7 +25383,7 @@ ${currentText}` : currentText;
           const newToken = this.blockquote(newText);
           tokens[tokens.length - 1] = newToken;
           raw = raw.substring(0, raw.length - oldToken.raw.length) + newToken.raw;
-          text = text.substring(0, text.length - oldToken.text.length) + newToken.text;
+          text2 = text2.substring(0, text2.length - oldToken.text.length) + newToken.text;
           break;
         } else if (lastToken?.type === "list") {
           const oldToken = lastToken;
@@ -25322,7 +25391,7 @@ ${currentText}` : currentText;
           const newToken = this.list(newText);
           tokens[tokens.length - 1] = newToken;
           raw = raw.substring(0, raw.length - lastToken.raw.length) + newToken.raw;
-          text = text.substring(0, text.length - oldToken.raw.length) + newToken.raw;
+          text2 = text2.substring(0, text2.length - oldToken.raw.length) + newToken.raw;
           lines = newText.substring(tokens.at(-1).raw.length).split("\n");
           continue;
         }
@@ -25331,7 +25400,7 @@ ${currentText}` : currentText;
         type: "blockquote",
         raw,
         tokens,
-        text
+        text: text2
       };
     }
   }
@@ -25592,12 +25661,12 @@ ${currentText}` : currentText;
   paragraph(src) {
     const cap = this.rules.block.paragraph.exec(src);
     if (cap) {
-      const text = cap[1].charAt(cap[1].length - 1) === "\n" ? cap[1].slice(0, -1) : cap[1];
+      const text2 = cap[1].charAt(cap[1].length - 1) === "\n" ? cap[1].slice(0, -1) : cap[1];
       return {
         type: "paragraph",
         raw: cap[0],
-        text,
-        tokens: this.lexer.inline(text)
+        text: text2,
+        tokens: this.lexer.inline(text2)
       };
     }
   }
@@ -25701,11 +25770,11 @@ ${currentText}` : currentText;
       const linkString = (cap[2] || cap[1]).replace(this.rules.other.multipleSpaceGlobal, " ");
       const link2 = links[linkString.toLowerCase()];
       if (!link2) {
-        const text = cap[0].charAt(0);
+        const text2 = cap[0].charAt(0);
         return {
           type: "text",
-          raw: text,
-          text
+          raw: text2,
+          text: text2
         };
       }
       return outputLink(cap, link2, cap[0], this.lexer, this.rules);
@@ -25741,20 +25810,20 @@ ${currentText}` : currentText;
         const lastCharLength = [...match2[0]][0].length;
         const raw = src.slice(0, lLength + match2.index + lastCharLength + rLength);
         if (Math.min(lLength, rLength) % 2) {
-          const text2 = raw.slice(1, -1);
+          const text22 = raw.slice(1, -1);
           return {
             type: "em",
             raw,
-            text: text2,
-            tokens: this.lexer.inlineTokens(text2)
+            text: text22,
+            tokens: this.lexer.inlineTokens(text22)
           };
         }
-        const text = raw.slice(2, -2);
+        const text2 = raw.slice(2, -2);
         return {
           type: "strong",
           raw,
-          text,
-          tokens: this.lexer.inlineTokens(text)
+          text: text2,
+          tokens: this.lexer.inlineTokens(text2)
         };
       }
     }
@@ -25762,16 +25831,16 @@ ${currentText}` : currentText;
   codespan(src) {
     const cap = this.rules.inline.code.exec(src);
     if (cap) {
-      let text = cap[2].replace(this.rules.other.newLineCharGlobal, " ");
-      const hasNonSpaceChars = this.rules.other.nonSpaceChar.test(text);
-      const hasSpaceCharsOnBothEnds = this.rules.other.startingSpaceChar.test(text) && this.rules.other.endingSpaceChar.test(text);
+      let text2 = cap[2].replace(this.rules.other.newLineCharGlobal, " ");
+      const hasNonSpaceChars = this.rules.other.nonSpaceChar.test(text2);
+      const hasSpaceCharsOnBothEnds = this.rules.other.startingSpaceChar.test(text2) && this.rules.other.endingSpaceChar.test(text2);
       if (hasNonSpaceChars && hasSpaceCharsOnBothEnds) {
-        text = text.substring(1, text.length - 1);
+        text2 = text2.substring(1, text2.length - 1);
       }
       return {
         type: "codespan",
         raw: cap[0],
-        text
+        text: text2
       };
     }
   }
@@ -25798,24 +25867,24 @@ ${currentText}` : currentText;
   autolink(src) {
     const cap = this.rules.inline.autolink.exec(src);
     if (cap) {
-      let text, href;
+      let text2, href;
       if (cap[2] === "@") {
-        text = cap[1];
-        href = "mailto:" + text;
+        text2 = cap[1];
+        href = "mailto:" + text2;
       } else {
-        text = cap[1];
-        href = text;
+        text2 = cap[1];
+        href = text2;
       }
       return {
         type: "link",
         raw: cap[0],
-        text,
+        text: text2,
         href,
         tokens: [
           {
             type: "text",
-            raw: text,
-            text
+            raw: text2,
+            text: text2
           }
         ]
       };
@@ -25824,17 +25893,17 @@ ${currentText}` : currentText;
   url(src) {
     let cap;
     if (cap = this.rules.inline.url.exec(src)) {
-      let text, href;
+      let text2, href;
       if (cap[2] === "@") {
-        text = cap[0];
-        href = "mailto:" + text;
+        text2 = cap[0];
+        href = "mailto:" + text2;
       } else {
         let prevCapZero;
         do {
           prevCapZero = cap[0];
           cap[0] = this.rules.inline._backpedal.exec(cap[0])?.[0] ?? "";
         } while (prevCapZero !== cap[0]);
-        text = cap[0];
+        text2 = cap[0];
         if (cap[1] === "www.") {
           href = "http://" + cap[0];
         } else {
@@ -25844,13 +25913,13 @@ ${currentText}` : currentText;
       return {
         type: "link",
         raw: cap[0],
-        text,
+        text: text2,
         href,
         tokens: [
           {
             type: "text",
-            raw: text,
-            text
+            raw: text2,
+            text: text2
           }
         ]
       };
@@ -26244,9 +26313,9 @@ var _Renderer = class {
   space(token) {
     return "";
   }
-  code({ text, lang, escaped }) {
+  code({ text: text2, lang, escaped }) {
     const langString = (lang || "").match(other.notSpaceStart)?.[0];
-    const code = text.replace(other.endingNewline, "") + "\n";
+    const code = text2.replace(other.endingNewline, "") + "\n";
     if (!langString) {
       return "<pre><code>" + (escaped ? code : escape22(code, true)) + "</code></pre>\n";
     }
@@ -26258,8 +26327,8 @@ var _Renderer = class {
 ${body}</blockquote>
 `;
   }
-  html({ text }) {
-    return text;
+  html({ text: text2 }) {
+    return text2;
   }
   heading({ tokens, depth }) {
     return `<h${depth}>${this.parser.parseInline(tokens)}</h${depth}>
@@ -26333,9 +26402,9 @@ ${body}</blockquote>
     if (body) body = `<tbody>${body}</tbody>`;
     return "<table>\n<thead>\n" + header + "</thead>\n" + body + "</table>\n";
   }
-  tablerow({ text }) {
+  tablerow({ text: text2 }) {
     return `<tr>
-${text}</tr>
+${text2}</tr>
 `;
   }
   tablecell(token) {
@@ -26354,8 +26423,8 @@ ${text}</tr>
   em({ tokens }) {
     return `<em>${this.parser.parseInline(tokens)}</em>`;
   }
-  codespan({ text }) {
-    return `<code>${escape22(text, true)}</code>`;
+  codespan({ text: text2 }) {
+    return `<code>${escape22(text2, true)}</code>`;
   }
   br(token) {
     return "<br>";
@@ -26364,29 +26433,29 @@ ${text}</tr>
     return `<del>${this.parser.parseInline(tokens)}</del>`;
   }
   link({ href, title, tokens }) {
-    const text = this.parser.parseInline(tokens);
+    const text2 = this.parser.parseInline(tokens);
     const cleanHref = cleanUrl(href);
     if (cleanHref === null) {
-      return text;
+      return text2;
     }
     href = cleanHref;
     let out = '<a href="' + href + '"';
     if (title) {
       out += ' title="' + escape22(title) + '"';
     }
-    out += ">" + text + "</a>";
+    out += ">" + text2 + "</a>";
     return out;
   }
-  image({ href, title, text, tokens }) {
+  image({ href, title, text: text2, tokens }) {
     if (tokens) {
-      text = this.parser.parseInline(tokens, this.parser.textRenderer);
+      text2 = this.parser.parseInline(tokens, this.parser.textRenderer);
     }
     const cleanHref = cleanUrl(href);
     if (cleanHref === null) {
-      return escape22(text);
+      return escape22(text2);
     }
     href = cleanHref;
-    let out = `<img src="${href}" alt="${text}"`;
+    let out = `<img src="${href}" alt="${text2}"`;
     if (title) {
       out += ` title="${escape22(title)}"`;
     }
@@ -26399,29 +26468,29 @@ ${text}</tr>
 };
 var _TextRenderer = class {
   // no need for block level renderers
-  strong({ text }) {
-    return text;
+  strong({ text: text2 }) {
+    return text2;
   }
-  em({ text }) {
-    return text;
+  em({ text: text2 }) {
+    return text2;
   }
-  codespan({ text }) {
-    return text;
+  codespan({ text: text2 }) {
+    return text2;
   }
-  del({ text }) {
-    return text;
+  del({ text: text2 }) {
+    return text2;
   }
-  html({ text }) {
-    return text;
+  html({ text: text2 }) {
+    return text2;
   }
-  text({ text }) {
-    return text;
+  text({ text: text2 }) {
+    return text2;
   }
-  link({ text }) {
-    return "" + text;
+  link({ text: text2 }) {
+    return "" + text2;
   }
-  image({ text }) {
-    return "" + text;
+  image({ text: text2 }) {
+    return "" + text2;
   }
   br() {
     return "";
@@ -27038,8 +27107,8 @@ function tokenToBlocks(token) {
       return [{ object: "block", type: "divider", divider: {} }];
     case "blockquote": {
       const t = token;
-      const text = t.tokens.filter((tk) => tk.type === "paragraph" || tk.type === "text").map((tk) => tk.text ?? "").join(" ");
-      return [{ object: "block", type: "quote", quote: { rich_text: inlineToRichText(text) } }];
+      const text2 = t.tokens.filter((tk) => tk.type === "paragraph" || tk.type === "text").map((tk) => tk.text ?? "").join(" ");
+      return [{ object: "block", type: "quote", quote: { rich_text: inlineToRichText(text2) } }];
     }
     case "code": {
       const t = token;
@@ -27094,28 +27163,28 @@ function tokenToBlocks(token) {
     case "html":
       return [];
     default: {
-      const text = token.text ?? token.raw ?? "";
-      if (!text.trim()) return [];
+      const text2 = token.text ?? token.raw ?? "";
+      if (!text2.trim()) return [];
       return [
-        { object: "block", type: "paragraph", paragraph: { rich_text: inlineToRichText(text) } }
+        { object: "block", type: "paragraph", paragraph: { rich_text: inlineToRichText(text2) } }
       ];
     }
   }
 }
 function listItemToBlock(item, ordered) {
-  const text = extractItemText(item);
+  const text2 = extractItemText(item);
   if (item.task) {
     return {
       object: "block",
       type: "to_do",
-      to_do: { rich_text: inlineToRichText(text), checked: Boolean(item.checked) }
+      to_do: { rich_text: inlineToRichText(text2), checked: Boolean(item.checked) }
     };
   }
   const type = ordered ? "numbered_list_item" : "bulleted_list_item";
   return {
     object: "block",
     type,
-    [type]: { rich_text: inlineToRichText(text) }
+    [type]: { rich_text: inlineToRichText(text2) }
   };
 }
 function extractItemText(item) {
@@ -27127,11 +27196,11 @@ function extractItemText(item) {
   }
   return parts.join(" ").trim();
 }
-function inlineToRichText(text) {
-  if (!text) return [];
+function inlineToRichText(text2) {
+  if (!text2) return [];
   const out = [];
   const lexer2 = new _Lexer();
-  const tokens = lexer2.inlineTokens(text);
+  const tokens = lexer2.inlineTokens(text2);
   for (const tk of tokens) {
     out.push(...inlineTokenToRichText(tk, {}));
   }
@@ -27170,8 +27239,8 @@ function inlineTokenToRichText(token, ann, link2) {
       return [textRich(t.text, ann, link2)];
     }
     default: {
-      const text = token.text ?? token.raw ?? "";
-      return text ? [textRich(text, ann, link2)] : [];
+      const text2 = token.text ?? token.raw ?? "";
+      return text2 ? [textRich(text2, ann, link2)] : [];
     }
   }
 }
@@ -27206,8 +27275,8 @@ function sameAnnotations(a, b) {
 function sameLink(a, b) {
   return (a?.url ?? null) === (b?.url ?? null);
 }
-function truncate(text) {
-  return text.length > NOTION_TEXT_LIMIT ? text.slice(0, NOTION_TEXT_LIMIT) : text;
+function truncate(text2) {
+  return text2.length > NOTION_TEXT_LIMIT ? text2.slice(0, NOTION_TEXT_LIMIT) : text2;
 }
 function isVideoUrl(url) {
   try {
@@ -27218,8 +27287,8 @@ function isVideoUrl(url) {
     return false;
   }
 }
-function isBareUrlText(text, href) {
-  return text.trim() === href.trim();
+function isBareUrlText(text2, href) {
+  return text2.trim() === href.trim();
 }
 function mapCodeLanguage(lang) {
   const l = (lang ?? "").toLowerCase().trim();
@@ -27319,6 +27388,7 @@ async function push(opts) {
   const state = await loadState(opts.repoRoot);
   const pushable = opts.mappings.filter((m) => m.resolvedDirection !== "pull");
   const files = await listLocalFiles(opts.repoRoot, pushable, opts.config.localIgnore);
+  files.sort((a, b) => fileDepth(a) - fileDepth(b));
   for (const file of files) {
     const parsed = await parseMarkdownFile(file.absPath);
     if (parsed.notionId) {
@@ -27330,8 +27400,13 @@ async function push(opts) {
         continue;
       }
     }
+    const depth = fileDepth(file);
     if (file.mapping.type === "database") {
-      await pushDatabaseRow(opts, file, parsed, state, result, log);
+      if (depth === 1) {
+        await pushDatabaseRow(opts, file, parsed, state, result, log);
+      } else {
+        await pushRowChildPage(opts, file, parsed, state, result, log);
+      }
     } else {
       await pushPage(opts, file, parsed, state, result, log);
     }
@@ -27339,6 +27414,11 @@ async function push(opts) {
   state.lastPushAt = (/* @__PURE__ */ new Date()).toISOString();
   await saveState(opts.repoRoot, state);
   return result;
+}
+function fileDepth(file) {
+  const mappingPrefix = file.mapping.local.replace(/\\/g, "/").replace(/\/$/, "") + "/";
+  const tail = file.relPath.startsWith(mappingPrefix) ? file.relPath.slice(mappingPrefix.length) : file.relPath;
+  return tail.split("/").length;
 }
 async function pushPage(opts, file, parsed, state, result, log) {
   const blocks = markdownToBlocks(parsed.body);
@@ -27409,6 +27489,53 @@ async function pushDatabaseRow(opts, file, parsed, state, result, log) {
     log(`  row created: ${file.relPath} \u2192 ${created.id} (${blocks.length} blocks)`);
     state.entries[created.id] = {
       notionId: created.id,
+      localPath: file.relPath,
+      notionLastEditedTime: (/* @__PURE__ */ new Date()).toISOString(),
+      contentHash: hashContent(await (0, import_promises7.readFile)(file.absPath, "utf-8"))
+    };
+  }
+}
+async function pushRowChildPage(opts, file, parsed, state, result, log) {
+  const parentFile = import_node_path5.default.join(import_node_path5.default.dirname(file.absPath) + ".md");
+  let parentId = null;
+  try {
+    const parentParsed = await parseMarkdownFile(parentFile);
+    parentId = parentParsed.notionId ?? null;
+  } catch {
+  }
+  if (!parentId) {
+    log(`  skip ${file.relPath}: parent ${import_node_path5.default.relative(opts.repoRoot, parentFile)} has no notion_id`);
+    result.skipped += 1;
+    return;
+  }
+  const blocks = markdownToBlocks(parsed.body);
+  const title = parsed.title || import_node_path5.default.basename(file.absPath, ".md");
+  if (parsed.notionId) {
+    await replacePageBlocks(opts.client, parsed.notionId, blocks);
+    await opts.client.pages.update({
+      page_id: parsed.notionId,
+      properties: titleProperty(title)
+    });
+    result.pagesUpdated += 1;
+    log(`  child updated: ${file.relPath} (${blocks.length} blocks)`);
+    state.entries[parsed.notionId] = {
+      notionId: parsed.notionId,
+      localPath: file.relPath,
+      notionLastEditedTime: (/* @__PURE__ */ new Date()).toISOString(),
+      contentHash: hashContent(await (0, import_promises7.readFile)(file.absPath, "utf-8"))
+    };
+  } else {
+    const created = await opts.client.pages.create({
+      parent: { page_id: parentId },
+      properties: titleProperty(title),
+      children: blocks
+    });
+    const newId = created.id;
+    await writeBackId(file.absPath, newId, created.url ?? "");
+    result.pagesCreated += 1;
+    log(`  child created: ${file.relPath} \u2192 ${newId} (${blocks.length} blocks)`);
+    state.entries[newId] = {
+      notionId: newId,
       localPath: file.relPath,
       notionLastEditedTime: (/* @__PURE__ */ new Date()).toISOString(),
       contentHash: hashContent(await (0, import_promises7.readFile)(file.absPath, "utf-8"))
@@ -27515,6 +27642,426 @@ ${import_yaml3.default.stringify(data).trimEnd()}
   await (0, import_promises7.writeFile)(filePath, newFm + rest, "utf-8");
 }
 
+// src/bootstrap/template.ts
+var RT = () => ({ rich_text: {} });
+var SEL = (...names) => ({
+  select: { options: names.map((name) => ({ name })) }
+});
+var MS = (...names) => ({
+  multi_select: { options: names.map((name) => ({ name })) }
+});
+var N = () => ({ number: { format: "number" } });
+var D = () => ({ date: {} });
+var CB = () => ({ checkbox: {} });
+var URL_ = () => ({ url: {} });
+var PEOPLE = () => ({ people: {} });
+var DATABASES = [
+  // — Quick Start Databases (11) ——————————————————————————————————————
+  { name: "Abstract Process Flows", parent: "qsd", titleProp: "Abstract Process Flow", properties: {} },
+  { name: "Process Flows", parent: "qsd", titleProp: "Process Flow", properties: { Description: RT() } },
+  {
+    name: "Waterfall Tasks",
+    parent: "qsd",
+    titleProp: "Task",
+    properties: {
+      "Task Id": RT(),
+      "Task Notes": RT(),
+      Type: SEL("Extension", "Integration", "Migration", "Reports"),
+      Status: RT(),
+      "Is Complete": CB(),
+      "Progress Percent": N(),
+      "Story Points": N(),
+      "Start Date": D(),
+      "Due Date": D()
+    }
+  },
+  {
+    name: "Issues",
+    parent: "qsd",
+    titleProp: "Issue",
+    properties: {
+      "Issue Id": RT(),
+      "Issue Notes": RT(),
+      Status: RT(),
+      Priority: RT(),
+      "Is Complete": CB(),
+      "Progress Percent": N(),
+      "Story Points": N(),
+      "Start Date": D(),
+      "Due Date": D()
+    }
+  },
+  {
+    name: "Milestones",
+    parent: "qsd",
+    titleProp: "Milestone",
+    properties: {
+      Description: RT(),
+      Sequence: N(),
+      "Start Date": D(),
+      "End Date": D(),
+      "Milestone Type": SEL(
+        "Project Launch",
+        "Sprint",
+        "CRP",
+        "Go-live",
+        "Hypercare",
+        "Other",
+        "Not Defined"
+      )
+    }
+  },
+  {
+    name: "Sprints",
+    parent: "qsd",
+    titleProp: "Sprint",
+    properties: {
+      "Sprint Code": RT(),
+      "Start Date": D(),
+      "End Date": D(),
+      "Show & Tell Date": D()
+    }
+  },
+  {
+    name: "Project Members",
+    parent: "qsd",
+    titleProp: "Name",
+    properties: {
+      Email: RT(),
+      Role: RT(),
+      "Is Sunrise": CB(),
+      "Notion User": PEOPLE()
+    }
+  },
+  {
+    name: "Sprint Goals",
+    parent: "qsd",
+    titleProp: "Goal",
+    properties: { Status: RT(), Notes: RT(), "Is Complete": CB() }
+  },
+  {
+    name: "Project Notes",
+    parent: "qsd",
+    titleProp: "Notes",
+    properties: { Type: RT(), Status: RT(), "Created Date": D() }
+  },
+  {
+    name: "Phases",
+    parent: "qsd",
+    titleProp: "Phase Code",
+    properties: { Description: RT(), "Start Date": D(), "End Date": D() }
+  },
+  {
+    name: "Subtasks",
+    parent: "qsd",
+    titleProp: "Subtask Id",
+    properties: {
+      "Subtask Name": RT(),
+      Notes: RT(),
+      "Story Points": N(),
+      "Start Date": D(),
+      "Due Date": D(),
+      Status: SEL(),
+      "Subtask Type": SEL(),
+      "Development Group": SEL(),
+      "Task Type": SEL("Not started", "In progress", "Done")
+    }
+  },
+  // — Under Settings (3) ———————————————————————————————————————————————
+  {
+    name: "Meetings",
+    parent: "settings",
+    titleProp: "Meeting",
+    properties: {
+      Date: D(),
+      Type: SEL("Shadowing Session", "Review Session", "Rehearsal", "Show & Tell")
+    }
+  },
+  {
+    name: "Notes",
+    parent: "settings",
+    titleProp: "Note Title",
+    properties: {
+      Date: D(),
+      Type: SEL("Shadowing Questions", "Design", "Cutover Tasks")
+    }
+  },
+  {
+    name: "Transcripts",
+    parent: "settings",
+    titleProp: "Title",
+    properties: {
+      Date: D(),
+      "Audio Recording": URL_(),
+      Transcript: URL_(),
+      Complete: CB(),
+      Attendees: MS()
+    }
+  }
+];
+var RELATIONS = [
+  ["Abstract Process Flows", "Process Flows", "Process Flows"],
+  ["Abstract Process Flows", "Waterfall Tasks", "Waterfall Tasks"],
+  ["Abstract Process Flows", "Meetings", "Meetings"],
+  ["Process Flows", "Owner", "Project Members"],
+  ["Process Flows", "Phase", "Phases"],
+  ["Process Flows", "Abstract Process Flow", "Abstract Process Flows"],
+  ["Process Flows", "Sprint Goals", "Sprint Goals"],
+  ["Process Flows", "Notes", "Notes"],
+  ["Waterfall Tasks", "Assigned To", "Project Members"],
+  ["Waterfall Tasks", "Milestone", "Milestones"],
+  ["Waterfall Tasks", "Phase", "Phases"],
+  ["Waterfall Tasks", "Abstract Process Flow", "Abstract Process Flows"],
+  ["Waterfall Tasks", "Notes", "Notes"],
+  ["Issues", "Assigned To", "Project Members"],
+  ["Issues", "Milestone", "Milestones"],
+  ["Issues", "Phase", "Phases"],
+  ["Issues", "Abstract Process Flow", "Abstract Process Flows"],
+  ["Issues", "Notes", "Notes"],
+  ["Sprints", "Sprint Goals", "Sprint Goals"],
+  ["Milestones", "Phase", "Phases"],
+  ["Milestones", "Issues", "Issues"],
+  ["Milestones", "Notes", "Notes"],
+  ["Milestones", "Waterfall Tasks", "Waterfall Tasks"],
+  ["Project Members", "Process Flows", "Process Flows"],
+  ["Project Members", "Sprint Goals", "Sprint Goals"],
+  ["Project Members", "Waterfall Tasks", "Waterfall Tasks"],
+  ["Project Members", "Meetings", "Meetings"],
+  ["Notes", "Process Flows", "Process Flows"],
+  ["Notes", "Waterfall Tasks", "Waterfall Tasks"],
+  ["Notes", "Milestones", "Milestones"],
+  ["Sprint Goals", "Owner", "Project Members"],
+  ["Sprint Goals", "Sprints", "Sprints"],
+  ["Sprint Goals", "Phase", "Phases"],
+  ["Sprint Goals", "Process Flows", "Process Flows"],
+  ["Subtasks", "Assigned To", "Project Members"],
+  ["Subtasks", "Waterfall Task", "Waterfall Tasks"],
+  ["Subtasks", "Issue", "Issues"],
+  ["Meetings", "Abstract Process Flows", "Abstract Process Flows"],
+  ["Meetings", "Transcript", "Transcripts"],
+  ["Meetings", "Meeting Attendees", "Project Members"],
+  ["Transcripts", "Meeting", "Meetings"]
+];
+var WATERFALL_SUBPAGES = [
+  { name: "Extensions", filter: "Extension", icon: "\u26A1", linkTarget: "self" },
+  { name: "Integrations", filter: "Integration", icon: "\u{1F50C}", linkTarget: "self" },
+  { name: "Migrations", filter: "Migration", icon: "\u{1F4E6}", linkTarget: "self" },
+  { name: "Reports", filter: "Reports", icon: "\u{1F4CA}", linkTarget: "self" },
+  { name: "Issues", filter: null, icon: "\u{1F41B}", linkTarget: "issues" }
+];
+var text = (content, italic = false) => ({
+  type: "text",
+  text: { content },
+  ...italic ? { annotations: { italic: true } } : {}
+});
+var heading1 = (t) => ({
+  type: "heading_1",
+  heading_1: { rich_text: [text(t)] }
+});
+var heading2 = (t) => ({
+  type: "heading_2",
+  heading_2: { rich_text: [text(t)] }
+});
+var divider = () => ({ type: "divider", divider: {} });
+var paragraph2 = (t, italic = false) => ({
+  type: "paragraph",
+  paragraph: { rich_text: [text(t, italic)] }
+});
+var linkPage = (id) => ({
+  type: "link_to_page",
+  link_to_page: { type: "page_id", page_id: id }
+});
+var linkDb = (id) => ({
+  type: "link_to_page",
+  link_to_page: { type: "database_id", database_id: id }
+});
+var column = (children) => ({
+  type: "column",
+  column: { children }
+});
+var columnList = (cols) => ({
+  type: "column_list",
+  column_list: { children: cols }
+});
+
+// src/bootstrap/run.ts
+async function bootstrap(opts) {
+  const log = opts.log ?? (() => {
+  });
+  const c = opts.client;
+  log("=== step 1: page tree ===");
+  const home = await mkPage(c, opts.starterPageId, "Project Home", "\u{1F305}", log);
+  const settings = await mkPage(c, home.id, "Settings", "\u{1F6E0}\uFE0F", log);
+  const qsd = await mkPage(c, settings.id, "Quick Start Databases", "\u{1F5C4}\uFE0F", log);
+  log("\n=== step 2: resource pages ===");
+  const pf = await mkPage(c, home.id, "Process Flows", "\u{1F500}", log);
+  const pd = await mkPage(c, home.id, "Project Definition", "\u{1F4D8}", log);
+  const wt = await mkPage(c, home.id, "Waterfall Tasks", "\u2705", log);
+  log(`
+=== step 3: ${DATABASES.length} databases ===`);
+  const dbIds = {};
+  for (const spec of DATABASES) {
+    const parentId = spec.parent === "qsd" ? qsd.id : settings.id;
+    const id = await mkDb(c, parentId, spec, log);
+    dbIds[spec.name] = id;
+  }
+  const need = (name) => {
+    const id = dbIds[name];
+    if (!id) throw new Error(`bootstrap: missing DB "${name}"`);
+    return id;
+  };
+  log("\n=== step 4: relations ===");
+  for (const [from, prop, to] of RELATIONS) {
+    await addRelation(c, need(from), prop, need(to), log);
+  }
+  log("\n=== step 5: rollup ===");
+  await c.databases.update({
+    database_id: need("Notes"),
+    properties: {
+      "Abstract Process Flow": {
+        rollup: {
+          relation_property_name: "Process Flows",
+          rollup_property_name: "Abstract Process Flow",
+          function: "show_unique"
+        }
+      }
+    }
+  });
+  log("  rollup Abstract Process Flow");
+  log("\n=== step 6: project home content ===");
+  await c.blocks.children.append({
+    block_id: home.id,
+    children: [
+      divider(),
+      columnList([
+        column([
+          heading2("Process Flows"),
+          linkPage(pf.id)
+        ]),
+        column([
+          heading2("Waterfall Tasks"),
+          linkPage(wt.id),
+          heading2("Project Definition"),
+          linkPage(pd.id)
+        ]),
+        column([
+          heading2("Resources"),
+          linkPage(pf.id),
+          linkPage(wt.id),
+          linkPage(pd.id),
+          linkPage(settings.id)
+        ])
+      ]),
+      heading1("Meetings"),
+      divider(),
+      paragraph2("Mirrored under Settings \u2192 Meetings."),
+      linkDb(need("Meetings")),
+      divider(),
+      heading2("Miscellaneous"),
+      linkDb(need("Project Notes")),
+      linkDb(need("Transcripts"))
+    ]
+  });
+  log("  added column layout + Meetings header + Miscellaneous section");
+  log("\n=== step 7: waterfall tasks sub-pages ===");
+  const subIds = {};
+  for (const sp of WATERFALL_SUBPAGES) {
+    const targetId = sp.linkTarget === "self" ? need("Waterfall Tasks") : need("Issues");
+    const description = sp.filter ? `Filtered view of Waterfall Tasks where Type = "${sp.filter}".` : "Issues are tracked in their own database.";
+    const next = sp.filter ? `To finish: in the Notion UI, type /linked, embed the Waterfall Tasks database, and add a filter Type = "${sp.filter}".` : "Open the Issues database below.";
+    const r = await c.pages.create({
+      parent: { type: "page_id", page_id: wt.id },
+      icon: { type: "emoji", emoji: sp.icon },
+      properties: { title: { title: [{ text: { content: sp.name } }] } },
+      children: [
+        paragraph2(description),
+        paragraph2(next, true),
+        linkDb(targetId)
+      ]
+    });
+    subIds[sp.name] = r.id;
+    log(`  \u2713 ${sp.name.padEnd(13)} ${r.id}`);
+  }
+  return {
+    projectHomeId: home.id,
+    settingsId: settings.id,
+    qsdId: qsd.id,
+    resourcePages: {
+      processFlows: pf.id,
+      projectDefinition: pd.id,
+      waterfallTasks: wt.id
+    },
+    databases: dbIds,
+    waterfallSubpages: subIds
+  };
+}
+async function mkPage(c, parentId, title, emoji, log) {
+  const r = await c.pages.create({
+    parent: { type: "page_id", page_id: parentId },
+    icon: { type: "emoji", emoji },
+    properties: { title: { title: [{ text: { content: title } }] } }
+  });
+  log(`  page   ${r.id} \xB7 ${title}`);
+  return { id: r.id };
+}
+async function mkDb(c, parentId, spec, log) {
+  const r = await c.databases.create({
+    parent: { type: "page_id", page_id: parentId },
+    title: [{ text: { content: spec.name } }],
+    properties: {
+      [spec.titleProp]: { title: {} },
+      ...spec.properties
+    }
+  });
+  log(`  db     ${r.id} \xB7 ${spec.name}`);
+  return r.id;
+}
+async function addRelation(c, fromDb, name, toDb, log) {
+  await c.databases.update({
+    database_id: fromDb,
+    properties: {
+      [name]: {
+        relation: {
+          database_id: toDb,
+          type: "single_property",
+          single_property: {}
+        }
+      }
+    }
+  });
+  log(`  rel    ${name} \u2192 ${toDb.slice(-12)}`);
+}
+function renderMappingsYaml(r) {
+  const lines = [];
+  lines.push(`notion:`);
+  lines.push(`  teamspaceId: ${r.projectHomeId}`);
+  lines.push(`  rootPageId:  ${r.projectHomeId}`);
+  lines.push("");
+  lines.push(`mappings:`);
+  lines.push(`  # \u2500\u2500 docs/ \u2014 page trees \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+  lines.push(`  - notion: "Process Flows"`);
+  lines.push(`    notionId: ${r.resourcePages.processFlows}`);
+  lines.push(`    local: docs/process-flows`);
+  lines.push(`  - notion: "Project Definition"`);
+  lines.push(`    notionId: ${r.resourcePages.projectDefinition}`);
+  lines.push(`    local: docs/project-definition`);
+  lines.push(`  - notion: "Waterfall Tasks"`);
+  lines.push(`    notionId: ${r.resourcePages.waterfallTasks}`);
+  lines.push(`    local: docs/waterfall-tasks`);
+  lines.push("");
+  lines.push(`  # \u2500\u2500 projectmanagement/ \u2014 databases \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+  for (const spec of DATABASES) {
+    const id = r.databases[spec.name];
+    if (!id) continue;
+    const slug = spec.name.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    lines.push(`  - notion: "${spec.name}"`);
+    lines.push(`    notionId: ${id}`);
+    lines.push(`    local: projectmanagement/${slug}`);
+    lines.push(`    type: database`);
+  }
+  return lines.join("\n");
+}
+
 // src/cli.ts
 var program2 = new Command();
 program2.name("volt-notion-sync").description("Sync a Notion teamspace to/from a project repo as markdown").version("0.2.0");
@@ -27582,6 +28129,22 @@ program2.command("routes").description("Print mappings classified by commitStrat
     }
   }
   console.log(JSON.stringify({ direct, pr }, null, 2));
+});
+program2.command("bootstrap").description(
+  "Build the Volt project template under a starter page (Project Home + 14 databases + relations + 3 resource pages + 5 waterfall sub-pages)"
+).argument("<starter-page-id>", "Notion page id under which to create Project Home (must already be shared with the integration)").option("--token <token>", "Notion integration token (defaults to $NOTION_TOKEN)").action(async (starterPageId, opts) => {
+  const token = opts.token || process.env.NOTION_TOKEN;
+  if (!token) die("NOTION_TOKEN is required (env var or --token)");
+  const client = createNotionClient({ token });
+  const result = await bootstrap({
+    client,
+    starterPageId,
+    log: (m) => console.log(m)
+  });
+  console.log("\n\u2713 Bootstrap complete.");
+  console.log(`Project Home id: ${result.projectHomeId}`);
+  console.log("\nPaste this into .volt/.volt-sync.yml:\n");
+  console.log(renderMappingsYaml(result));
 });
 program2.command("scaffold").description("Drop the workflow + config templates and CLI bundle into the current repo").option("--repo <path>", "project repo root", process.cwd()).option("--force", "overwrite existing files", false).option("--bundle <path>", "path to volt-notion-sync.cjs to copy into .volt/.cli/").action(async (opts) => {
   const repoRoot = import_node_path6.default.resolve(opts.repo);
