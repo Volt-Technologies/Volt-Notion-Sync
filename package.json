@@ -17,6 +17,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "prepare": "tsc",
     "watch": "tsc -w",
     "clean": "rimraf dist bundle",
     "typecheck": "tsc --noEmit",

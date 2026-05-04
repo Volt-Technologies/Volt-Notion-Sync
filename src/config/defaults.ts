@@ -42,6 +42,17 @@ jobs:
         with:
           node-version: '20'
 
+      # The CLI lives in Volt-Technologies/Volt-Notion-Sync. We pull it
+      # via npx on every run so each project repo automatically picks up
+      # engine updates without needing the bundle copied in. Pin to a tag
+      # (e.g. github:Volt-Technologies/Volt-Notion-Sync#v0.2.0) if you
+      # want a project to stop tracking main.
+      - name: Cache npx download
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm/_npx
+          key: npx-volt-notion-sync-\${{ runner.os }}
+
       # ─── Notion → repo (PULL ONLY) ────────────────────────────────
       # Triggered by webhook dispatch, cron, or manual run. We deliberately
       # do NOT push here — pushing on these triggers would write the just-
@@ -51,7 +62,7 @@ jobs:
         if: github.event_name != 'push'
         env:
           NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
-        run: node .volt/.cli/volt-notion-sync.cjs pull --repo "$GITHUB_WORKSPACE"
+        run: npx --yes github:Volt-Technologies/Volt-Notion-Sync pull --repo "$GITHUB_WORKSPACE"
 
       - name: Commit pulled changes (direct-mode)
         if: github.event_name != 'push'
@@ -93,7 +104,7 @@ jobs:
         if: github.event_name == 'push' && github.actor != 'volt-notion-sync[bot]' && !contains(github.event.head_commit.message, '[skip ci]') && steps.pushable_changes.outputs.skip != 'true'
         env:
           NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
-        run: node .volt/.cli/volt-notion-sync.cjs push --repo "$GITHUB_WORKSPACE"
+        run: npx --yes github:Volt-Technologies/Volt-Notion-Sync push --repo "$GITHUB_WORKSPACE"
 
       - name: Commit notion_id write-back from new pages
         if: github.event_name == 'push' && github.actor != 'volt-notion-sync[bot]' && !contains(github.event.head_commit.message, '[skip ci]') && steps.pushable_changes.outputs.skip != 'true'
@@ -114,13 +125,13 @@ jobs:
           NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
           GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         run: |
-          ROUTES=$(node .volt/.cli/volt-notion-sync.cjs routes --no-resolve --repo "$GITHUB_WORKSPACE")
+          ROUTES=$(npx --yes github:Volt-Technologies/Volt-Notion-Sync routes --no-resolve --repo "$GITHUB_WORKSPACE")
           PR_COUNT=$(echo "$ROUTES" | jq '.pr | length')
           if [ "$PR_COUNT" = "0" ]; then
             echo "no pr-mode mappings"
             exit 0
           fi
-          node .volt/.cli/volt-notion-sync.cjs pull --repo "$GITHUB_WORKSPACE" || true
+          npx --yes github:Volt-Technologies/Volt-Notion-Sync pull --repo "$GITHUB_WORKSPACE" || true
           if [ -z "$(git status --porcelain)" ]; then
             echo "no pr-mode changes"
             exit 0

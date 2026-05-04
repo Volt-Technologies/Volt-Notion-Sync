@@ -1,14 +1,23 @@
 name: Volt Notion Sync
 
+# Triggers, in order of how this workflow gets woken up:
+#   - repository_dispatch  — Fired by the Volt platform when Notion sends a
+#                            webhook event for this project (debounced 60s).
+#                            Primary path; ~5-30s end-to-end.
+#   - schedule (6h cron)   — Safety net for missed/late webhooks and outages.
+#   - workflow_dispatch    — Manual "sync now" from the GitHub UI.
+#   - push                 — When a developer commits to .volt/**/*.md on main,
+#                            push those changes back to Notion.
 on:
+  repository_dispatch:
+    types: [notion-changed]
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
   push:
     branches: [main]
     paths:
-      - '.volt/**'
-      - '!.volt/.sync-state.json'
+      - '.volt/**/*.md'
 
 concurrency:
   group: volt-notion-sync
@@ -29,36 +38,83 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install volt-notion-sync
-        run: npm install -g @volt/notion-sync
+      # The CLI lives in Volt-Technologies/Volt-Notion-Sync. We pull it
+      # via npx on every run so each project repo automatically picks up
+      # engine updates without needing the bundle copied in. Pin to a tag
+      # (e.g. github:Volt-Technologies/Volt-Notion-Sync#v0.2.0) if you
+      # want a project to stop tracking main.
+      - name: Cache npx download
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm/_npx
+          key: npx-volt-notion-sync-${{ runner.os }}
 
-      - name: Sync direct-mode mappings (commit to main)
+      # ─── Notion → repo (PULL ONLY) ────────────────────────────────
+      - name: Pull from Notion
+        if: github.event_name != 'push'
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-        run: volt-notion-sync sync --repo "$GITHUB_WORKSPACE" --strategy direct
+        run: npx --yes github:Volt-Technologies/Volt-Notion-Sync pull --repo "$GITHUB_WORKSPACE"
 
-      - name: Commit and push direct-mode changes
+      - name: Commit pulled changes (direct-mode)
+        if: github.event_name != 'push'
         run: |
           git config user.name  "volt-notion-sync[bot]"
           git config user.email "volt-notion-sync[bot]@users.noreply.github.com"
           if [ -n "$(git status --porcelain)" ]; then
             git add -A
-            git commit -m "chore(notion-sync): pull $(date -u +%FT%TZ)"
+            git commit -m "chore(notion-sync): pull $(date -u +%FT%TZ) [skip ci]"
+            git push
+          else
+            echo "no changes"
+          fi
+
+      # ─── repo → Notion (PUSH ONLY) ────────────────────────────────
+      - name: Detect pushable markdown changes
+        id: pushable_changes
+        if: github.event_name == 'push' && github.actor != 'volt-notion-sync[bot]' && !contains(github.event.head_commit.message, '[skip ci]')
+        run: |
+          CHANGED_MD=$(git diff --name-only "${{ github.event.before }}" "${{ github.event.after }}" -- '.volt/**/*.md' || true)
+          if [ -z "$CHANGED_MD" ]; then
+            echo "no markdown changes in .volt/ — skipping push"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pushable .md files in this push:"
+            echo "$CHANGED_MD"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push to Notion
+        if: github.event_name == 'push' && github.actor != 'volt-notion-sync[bot]' && !contains(github.event.head_commit.message, '[skip ci]') && steps.pushable_changes.outputs.skip != 'true'
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: npx --yes github:Volt-Technologies/Volt-Notion-Sync push --repo "$GITHUB_WORKSPACE"
+
+      - name: Commit notion_id write-back from new pages
+        if: github.event_name == 'push' && github.actor != 'volt-notion-sync[bot]' && !contains(github.event.head_commit.message, '[skip ci]') && steps.pushable_changes.outputs.skip != 'true'
+        run: |
+          git config user.name  "volt-notion-sync[bot]"
+          git config user.email "volt-notion-sync[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "chore(notion-sync): write back notion_id $(date -u +%FT%TZ) [skip ci]"
             git push
           fi
 
+      # ─── PR-mode mappings ─────────────────────────────────────────
       - name: Sync PR-mode mappings (open PR per mapping)
+        if: github.event_name != 'push'
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ROUTES=$(volt-notion-sync routes --no-resolve --repo "$GITHUB_WORKSPACE")
+          ROUTES=$(npx --yes github:Volt-Technologies/Volt-Notion-Sync routes --no-resolve --repo "$GITHUB_WORKSPACE")
           PR_COUNT=$(echo "$ROUTES" | jq '.pr | length')
           if [ "$PR_COUNT" = "0" ]; then
             echo "no pr-mode mappings"
             exit 0
           fi
-          volt-notion-sync sync --repo "$GITHUB_WORKSPACE" --strategy pr || true
+          npx --yes github:Volt-Technologies/Volt-Notion-Sync pull --repo "$GITHUB_WORKSPACE" || true
           if [ -z "$(git status --porcelain)" ]; then
             echo "no pr-mode changes"
             exit 0
@@ -66,7 +122,7 @@ jobs:
           BRANCH="notion-sync/pr-$(date -u +%Y%m%d-%H%M%S)"
           git checkout -b "$BRANCH"
           git add -A
-          git commit -m "chore(notion-sync): pr-mode pull $(date -u +%FT%TZ)"
+          git commit -m "chore(notion-sync): pr-mode pull $(date -u +%FT%TZ) [skip ci]"
           git push -u origin "$BRANCH"
           gh pr create \
             --base main \
