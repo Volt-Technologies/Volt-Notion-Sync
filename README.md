@@ -300,7 +300,30 @@ If multiple customer projects share one Notion workspace, swap `mappingKey` to a
 - `@triggerBody()?['data']?['parent']?['id']` — parent ID, similar shape.
 - A composite key built with `concat(...)` if you need multi-part discrimination.
 
-Onboarding a new customer = edit the `repoMapping` parameter value in the portal and save. No code change.
+### Adding a new project (Logic App receiver)
+
+Once the Logic App is deployed, onboarding each additional customer project is a 5-step flow. No code or infrastructure change — just config.
+
+1. **Scaffold the project repo** with the Volt CLI as in the main onboarding section (drops `.volt/`, the workflow file, and the bundled engine into the repo). Set `notion.teamspaceId` and `notion.rootPageId` in `.volt/.volt-sync.yml`.
+
+2. **Add `NOTION_TOKEN` as a GitHub Actions secret** on the new repo (Settings → Secrets and variables → Actions).
+
+3. **Find the Notion lookup key.** With the default `mappingKey: workspace_id`, grab the workspace UUID from any page URL or from a previous webhook delivery's run history. If the Logic App keys by parent `data_source_id` instead, list the database IDs the project uses.
+
+4. **Add the mapping entry** in the Azure portal: Logic App → **`{ } Parameters`** → edit `repoMapping`:
+   ```json
+   {
+     "<existing-key>":      { "owner": "grvolttechnologies", "repo": "ExistingRepo" },
+     "<new-customer-key>":  { "owner": "grvolttechnologies", "repo": "NewCustomerRepo" }
+   }
+   ```
+   Save the parameters, then save the workflow.
+
+5. **Register the webhook in Notion.** In the customer's Notion integration → Webhooks tab → **Create subscription**. Paste the **same** Logic App HTTP POST URL that all other customers use (it's a single shared endpoint — the Logic App routes by the lookup key inside the payload). Notion sends a verification POST → check the Logic App run history → the run output contains `received_verification_token` → paste that back into Notion's UI to activate.
+
+After step 5, edits in the Notion teamspace will trigger the workflow in the new repo within seconds. To verify end-to-end, edit a page in Notion and watch the GitHub repo's Actions tab for a `repository_dispatch` run.
+
+**To remove a project**: delete its mapping entry in `repoMapping` (the Logic App will log "No repoMapping entry for key …" and stop) and disable/delete the subscription in Notion's integration UI. The Logic App itself doesn't need redeploying.
 
 ### Gotchas worth flagging
 
