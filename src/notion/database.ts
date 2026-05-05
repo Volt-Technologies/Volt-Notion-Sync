@@ -55,10 +55,21 @@ export interface NormalizedRow {
 }
 
 export async function exportDatabase(client: Client, databaseId: string): Promise<DatabaseExport> {
-  const db = (await client.databases.retrieve({ database_id: databaseId })) as unknown as RawDatabase;
+  // @notionhq/client@2.3.x's typed `databases.retrieve` predates the
+  // 2025-09-03 API split and doesn't surface `data_sources` in its
+  // response — calling through `client.request` returns the raw payload
+  // which does include the array.
+  const c = client as unknown as { request: (args: unknown) => Promise<unknown> };
+  const db = (await c.request({
+    path: `databases/${databaseId}`,
+    method: 'get',
+  })) as RawDatabase;
   const dataSourceId = db.data_sources?.[0]?.id;
   if (!dataSourceId) {
-    throw new Error(`Database ${databaseId} has no data sources (Notion API 2025-09-03+ required)`);
+    throw new Error(
+      `Database ${databaseId} has no data sources (Notion API 2025-09-03+ required). ` +
+        `Raw response keys: ${Object.keys(db as unknown as Record<string, unknown>).join(', ')}`,
+    );
   }
   const ds = (await fetchDataSource(client, dataSourceId)) as RawDataSource;
   const rows = await queryAllRows(client, dataSourceId);
