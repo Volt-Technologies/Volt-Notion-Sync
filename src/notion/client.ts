@@ -33,9 +33,14 @@ export function createNotionClient(opts: NotionClientOptions): Client {
 }
 
 const TRANSIENT_HTTP_STATUSES = new Set([429, 500, 502, 503, 504]);
-const MAX_ATTEMPTS = 4;
+const MAX_ATTEMPTS = 6;
 const BASE_DELAY_MS = 1_000;
-const MAX_DELAY_MS = 30_000;
+const MAX_DELAY_MS = 60_000;
+// Notion's rate-limit response says "try again in a few minutes" with
+// no programmatic backoff hint exposed by the SDK. Use a longer floor
+// for rate_limited specifically so we don't burn through retries while
+// still well under the cooldown.
+const RATE_LIMIT_BASE_DELAY_MS = 30_000;
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   let lastErr: unknown;
@@ -45,8 +50,11 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
     } catch (err) {
       if (!isTransient(err) || attempt === MAX_ATTEMPTS) throw err;
       lastErr = err;
-      const delay = Math.min(MAX_DELAY_MS, BASE_DELAY_MS * 2 ** (attempt - 1));
-      const jitter = Math.floor(Math.random() * 250);
+      const isRateLimited =
+        err instanceof APIResponseError && err.code === 'rate_limited';
+      const baseDelay = isRateLimited ? RATE_LIMIT_BASE_DELAY_MS : BASE_DELAY_MS;
+      const delay = Math.min(MAX_DELAY_MS, baseDelay * 2 ** (attempt - 1));
+      const jitter = Math.floor(Math.random() * 1_000);
       // Make retries observable in CI logs so a slow/rate-limited
       // run doesn't look silently stuck.
       const code = (err as { code?: string }).code ?? (err as Error).name;
