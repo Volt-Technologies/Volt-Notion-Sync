@@ -200,14 +200,21 @@ jobs:
         run: |
           git config user.name  "volt-notion-sync[bot]"
           git config user.email "volt-notion-sync[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain)" ]; then
-            git add -A
+          # Stage everything, then unstage the sync-state file. That file
+          # holds lastPullAt, which the engine rewrites on every pull —
+          # including pulls where no Notion content changed. Without this
+          # filter, every cron tick would create a noisy timestamp-only
+          # commit. We still write it locally for the next run on the
+          # same runner; we just don't push it.
+          git add -A
+          git reset HEAD '.volt/.sync-state.json' >/dev/null 2>&1 || true
+          if ! git diff --cached --quiet; then
             # [skip ci] keeps the resulting commit from re-triggering this
             # same workflow on the push trigger below.
             git commit -m "chore(notion-sync): pull $(date -u +%FT%TZ) [skip ci]"
             git push
           else
-            echo "no changes"
+            echo "no content changes"
           fi
 
       # ─── repo → Notion (PUSH ONLY) ────────────────────────────────
@@ -242,8 +249,9 @@ jobs:
         run: |
           git config user.name  "volt-notion-sync[bot]"
           git config user.email "volt-notion-sync[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain)" ]; then
-            git add -A
+          git add -A
+          git reset HEAD '.volt/.sync-state.json' >/dev/null 2>&1 || true
+          if ! git diff --cached --quiet; then
             git commit -m "chore(notion-sync): write back notion_id $(date -u +%FT%TZ) [skip ci]"
             git push
           fi
@@ -263,13 +271,14 @@ jobs:
             exit 0
           fi
           npx --yes github:Volt-Technologies/Volt-Notion-Sync pull --repo "$GITHUB_WORKSPACE" || true
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "no pr-mode changes"
+          git add -A
+          git reset HEAD '.volt/.sync-state.json' >/dev/null 2>&1 || true
+          if git diff --cached --quiet; then
+            echo "no pr-mode content changes"
             exit 0
           fi
           BRANCH="notion-sync/pr-$(date -u +%Y%m%d-%H%M%S)"
           git checkout -b "$BRANCH"
-          git add -A
           git commit -m "chore(notion-sync): pr-mode pull $(date -u +%FT%TZ) [skip ci]"
           git push -u origin "$BRANCH"
           gh pr create \\
