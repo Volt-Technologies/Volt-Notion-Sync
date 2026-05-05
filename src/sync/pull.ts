@@ -131,8 +131,90 @@ async function pullPageTree(
 
     pagesWritten += 1;
     log(`  page: ${fileRel}`);
+
+    // Pages can host inline databases (e.g. a "Extensions" section page
+    // whose body is mostly a database widget of EXT-xxxxx tasks). Pull
+    // each of those DBs' rows into the page's folder so they land in
+    // the repo without requiring an explicit per-DB mapping.
+    if (node.childDatabaseIds.length > 0) {
+      const pageFolder = path.posix.dirname(fileRel);
+      const flat = node.childDatabaseIds.length === 1;
+      for (const dbId of node.childDatabaseIds) {
+        await pullEmbeddedDatabase(opts, dbId, pageFolder, flat, state, writtenPaths, skipIds);
+      }
+    }
   }
   return { pagesWritten };
+}
+
+// Export a database whose `child_database` block sits inside a page tree
+// (and whose rows wouldn't otherwise be pulled). Layout:
+//   - 1 DB on the page  → rows flat in pageFolder, schema at _index.json
+//   - 2+ DBs on the page → rows in pageFolder/<db-slug>/, schema in there
+// Auto-resolve handles the inline-vs-canonical case when data_sources is
+// empty. If the canonical can't be uniquely resolved, log + skip rather
+// than fail the whole pull — the user can pin notionId via an explicit
+// mapping when this matters.
+async function pullEmbeddedDatabase(
+  opts: PullOptions,
+  databaseBlockId: string,
+  pageFolder: string,
+  flat: boolean,
+  state: SyncState,
+  writtenPaths: Set<string>,
+  skipIds: Set<string>,
+): Promise<void> {
+  const log = opts.log ?? (() => {});
+  let exp: DatabaseExport;
+  try {
+    exp = await exportDatabase(opts.client, databaseBlockId);
+  } catch (err) {
+    log(`    embedded db ${databaseBlockId}: skipped (${(err as Error).message})`);
+    return;
+  }
+
+  // Pull a title for the schema folder when not flat.
+  const titleProp = exp.rows[0]?.title;
+  const dbSlug = flat ? '' : slugify(titleProp || 'database');
+  const baseFolder = flat ? pageFolder : path.posix.join(pageFolder, dbSlug);
+
+  const indexPath = path.posix.join(baseFolder, '_index.json');
+  const indexFull = path.join(opts.repoRoot, '.volt', indexPath);
+  const indexContent = JSON.stringify(
+    {
+      databaseId: exp.databaseId,
+      dataSourceId: exp.dataSourceId,
+      schema: exp.schema,
+      rowCount: exp.rows.length,
+      embedded: true,
+    },
+    null,
+    2,
+  );
+  await writeFileEnsured(indexFull, indexContent);
+  writtenPaths.add(path.normalize(indexFull));
+
+  let rowsWritten = 0;
+  for (const row of exp.rows) {
+    if (isIgnoredNotion([row.title], opts.config.notionIgnore)) continue;
+    if (skipIds.has(row.id)) continue;
+    const rowSlug = slugify(row.title || row.id);
+    const fileRel = path.posix.join(baseFolder, rowSlug + '.md');
+    const filePath = path.join(opts.repoRoot, '.volt', fileRel);
+    const body = await pageBlocksToMarkdown(opts.client, row.id);
+    const content = renderRowMarkdown(opts.config, row, exp, body);
+    await writeFileEnsured(filePath, content);
+    writtenPaths.add(path.normalize(filePath));
+
+    state.entries[row.id] = {
+      notionId: row.id,
+      localPath: fileRel,
+      notionLastEditedTime: row.lastEditedTime,
+      contentHash: hashContent(content),
+    };
+    rowsWritten += 1;
+  }
+  log(`    embedded db → ${baseFolder}: ${rowsWritten} row(s)`);
 }
 
 async function pullDatabase(

@@ -12,7 +12,14 @@ import type { Mapping } from './types.js';
 // at the top level to opt out of all of them.
 //
 // Verified against White & Warren's Project Home tree (2026-05-05).
+//
+// Quickstart projects also expose canonical databases under
+// Settings → Databases (Waterfall Tasks, Issues, Sprints, etc.). Those
+// aren't direct children of Project Home; the resolver discovers them
+// via a deep tree scan when a database-typed standard mapping doesn't
+// match a direct child by name.
 export const STANDARD_MAPPINGS: Mapping[] = [
+  // ── Page trees ────────────────────────────────────────────────────
   {
     notion: 'Process Flows',
     local: 'docs/process-flows',
@@ -34,9 +41,104 @@ export const STANDARD_MAPPINGS: Mapping[] = [
     optional: true,
     disabled: false,
   },
+  // ── Databases (canonical, under Settings → Databases) ─────────────
+  // Database rows for "Waterfall Tasks" land alongside the page tree
+  // (rows are siblings to the sub-page folders like extensions/,
+  // issues/, etc.). Other DBs get their own folders.
   {
     notion: 'Meetings',
     local: 'projectmanagement/meetings',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Waterfall Tasks',
+    local: 'projectmanagement/waterfall-tasks',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Issues',
+    local: 'projectmanagement/issues',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Sprints',
+    local: 'projectmanagement/sprints',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Milestones',
+    local: 'projectmanagement/milestones',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Phases',
+    local: 'projectmanagement/phases',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Project Members',
+    local: 'projectmanagement/project-members',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Process Flows',
+    local: 'projectmanagement/process-flows',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Abstract Process Flows',
+    local: 'projectmanagement/abstract-process-flows',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Notes',
+    local: 'projectmanagement/notes',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Sprint Goals',
+    local: 'projectmanagement/sprint-goals',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Transcripts',
+    local: 'projectmanagement/transcripts',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Project Notes',
+    local: 'projectmanagement/project-notes',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Subtasks',
+    local: 'projectmanagement/subtasks',
     type: 'database',
     optional: true,
     disabled: false,
@@ -77,7 +179,11 @@ export function mergeMappings(
   }
 
   const out: Mapping[] = [];
-  const overridesByStdNotion = new Map<string, Mapping>();
+  // Key by (notion, type) so an override targeting the "Waterfall
+  // Tasks" page doesn't accidentally also override the "Waterfall
+  // Tasks" database standard with the same name. When the repo entry
+  // omits `type`, we use the matched standard's type as the key.
+  const overridesByStdKey = new Map<string, Mapping>();
   const repoExtras: Mapping[] = [];
 
   for (const m of repo) {
@@ -87,7 +193,7 @@ export function mergeMappings(
         )
       : undefined;
     if (std) {
-      overridesByStdNotion.set(std.notion!, m);
+      overridesByStdKey.set(stdKey(std), m);
     } else {
       if (!m.local) {
         throw new Error(
@@ -100,7 +206,7 @@ export function mergeMappings(
   }
 
   for (const std of STANDARD_MAPPINGS) {
-    const override = overridesByStdNotion.get(std.notion!);
+    const override = overridesByStdKey.get(stdKey(std));
     if (!override) {
       out.push(std);
       continue;
@@ -117,6 +223,10 @@ export function mergeMappings(
 
   out.push(...repoExtras);
   return out;
+}
+
+function stdKey(m: Mapping): string {
+  return `${m.notion}|${m.type ?? 'page'}`;
 }
 
 function fillTypeDefault(m: Mapping): Mapping {

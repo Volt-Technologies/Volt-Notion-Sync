@@ -8,6 +8,10 @@ export interface NotionPageNode {
   url: string;
   archived: boolean;
   childPageIds: string[];
+  // Child databases nested directly under this page (may include inline
+  // database blocks). Surfaces so pull can auto-export their rows
+  // alongside the page's index.md without requiring a per-DB mapping.
+  childDatabaseIds: string[];
   rawProperties: Record<string, unknown>;
   icon: unknown;
 }
@@ -121,6 +125,11 @@ async function listChildPageIds(client: Client, pageId: string): Promise<string[
   return named.filter((c) => c.kind === 'page').map((c) => c.id);
 }
 
+async function listChildDatabaseIds(client: Client, pageId: string): Promise<string[]> {
+  const named = await collectNamedChildren(client, pageId);
+  return named.filter((c) => c.kind === 'database').map((c) => c.id);
+}
+
 export async function fetchPageNode(
   client: Client,
   pageId: string,
@@ -128,7 +137,9 @@ export async function fetchPageNode(
 ): Promise<NotionPageNode> {
   const page = await fetchPage(client, pageId);
   const title = extractPageTitle(page.properties);
-  const childPageIds = await listChildPageIds(client, pageId);
+  const named = await collectNamedChildren(client, pageId);
+  const childPageIds = named.filter((c) => c.kind === 'page').map((c) => c.id);
+  const childDatabaseIds = named.filter((c) => c.kind === 'database').map((c) => c.id);
   return {
     id: page.id,
     title,
@@ -137,6 +148,7 @@ export async function fetchPageNode(
     url: page.url ?? '',
     archived: Boolean(page.archived || page.in_trash),
     childPageIds,
+    childDatabaseIds,
     rawProperties: page.properties ?? {},
     icon: page.icon,
   };
