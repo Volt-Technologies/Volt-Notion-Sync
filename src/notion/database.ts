@@ -67,8 +67,11 @@ export async function exportDatabase(client: Client, databaseId: string): Promis
   const dataSourceId = db.data_sources?.[0]?.id;
   if (!dataSourceId) {
     throw new Error(
-      `Database ${databaseId} has no data sources (Notion API 2025-09-03+ required). ` +
-        `Raw response keys: ${Object.keys(db as unknown as Record<string, unknown>).join(', ')}`,
+      `Database ${databaseId} has no usable data source. ` +
+        `data_sources field value: ${JSON.stringify(db.data_sources)}. ` +
+        `If empty/null, the integration may need to be re-shared with the database ` +
+        `at the data-source level, or the database may be a linked/synced reference ` +
+        `(no data source of its own).`,
     );
   }
   const ds = (await fetchDataSource(client, dataSourceId)) as RawDataSource;
