@@ -1,13 +1,7 @@
 import type { Client } from '@notionhq/client';
 import type { Config, Mapping, ResolvedMapping } from '../config/types.js';
-import { fetchPageNode, listChildBlocks, extractPageTitle } from '../notion/walker.js';
-
-interface RawBlock {
-  id: string;
-  type: string;
-  child_page?: { title?: string };
-  child_database?: { title?: string };
-}
+import { collectNamedChildren, fetchPageNode } from '../notion/walker.js';
+import type { NamedChildBlock } from '../notion/walker.js';
 
 export class MappingResolutionError extends Error {
   constructor(public readonly mapping: Mapping, message: string) {
@@ -16,11 +10,7 @@ export class MappingResolutionError extends Error {
   }
 }
 
-interface NamedChild {
-  id: string;
-  title: string;
-  kind: 'page' | 'database';
-}
+type NamedChild = NamedChildBlock;
 
 export async function resolveMappings(
   client: Client,
@@ -28,7 +18,7 @@ export async function resolveMappings(
 ): Promise<ResolvedMapping[]> {
   const needsRootLookup = config.mappings.some((m) => !m.notionId && m.notion);
   const rootChildren = needsRootLookup
-    ? await listNamedChildren(client, config.notion.rootPageId)
+    ? await collectNamedChildren(client, config.notion.rootPageId)
     : [];
   const resolved: ResolvedMapping[] = [];
 
@@ -58,9 +48,15 @@ export async function resolveMappings(
     if (!id) {
       throw new MappingResolutionError(m, 'Mapping resolved to no id');
     }
+    if (!m.local) {
+      // Defensive: load.ts/mergeMappings should ensure every mapping has
+      // a local path before we get here.
+      throw new MappingResolutionError(m, 'Mapping has no local path after merge');
+    }
 
     resolved.push({
       ...m,
+      local: m.local,
       resolvedNotionId: id,
       resolvedDirection: direction,
       resolvedCommitStrategy: commitStrategy,
@@ -69,32 +65,11 @@ export async function resolveMappings(
   return resolved;
 }
 
-async function listNamedChildren(client: Client, parentId: string): Promise<NamedChild[]> {
-  const blocks = (await listChildBlocks(client, parentId)) as unknown as RawBlock[];
-  const out: NamedChild[] = [];
-  for (const b of blocks) {
-    if (b.type === 'child_page' && b.child_page?.title) {
-      out.push({ id: b.id, title: b.child_page.title, kind: 'page' });
-    } else if (b.type === 'child_database' && b.child_database?.title) {
-      out.push({ id: b.id, title: b.child_database.title, kind: 'database' });
-    }
-  }
-  return out;
-}
-
 export async function inspectRoot(client: Client, rootPageId: string): Promise<{
   rootTitle: string;
   children: NamedChild[];
 }> {
   const root = await fetchPageNode(client, rootPageId, []);
-  const blocks = (await listChildBlocks(client, rootPageId)) as unknown as RawBlock[];
-  const children: NamedChild[] = [];
-  for (const b of blocks) {
-    if (b.type === 'child_page' && b.child_page?.title) {
-      children.push({ id: b.id, title: b.child_page.title, kind: 'page' });
-    } else if (b.type === 'child_database' && b.child_database?.title) {
-      children.push({ id: b.id, title: b.child_database.title, kind: 'database' });
-    }
-  }
+  const children = await collectNamedChildren(client, rootPageId);
   return { rootTitle: root.title, children };
 }

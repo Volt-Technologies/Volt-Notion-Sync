@@ -2,6 +2,11 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import YAML from 'yaml';
 import { ConfigSchema, type Config } from './types.js';
+import {
+  mergeMappings,
+  STANDARD_LOCAL_IGNORE,
+  STANDARD_NOTION_IGNORE,
+} from './defaults.js';
 
 export const CONFIG_FILENAME = '.volt-sync.yml';
 export const VOLT_DIR = '.volt';
@@ -38,5 +43,21 @@ export async function loadConfig(repoRoot: string): Promise<Config> {
     const issues = result.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');
     throw new ConfigError(`Invalid config in ${configPath}:\n${issues}`, configPath);
   }
-  return result.data;
+
+  const cfg = result.data;
+  const mappings = mergeMappings(cfg.mappings, cfg.useStandardMappings);
+  if (mappings.length === 0) {
+    throw new ConfigError(
+      `No mappings defined in ${configPath} and useStandardMappings is false. ` +
+        `Add at least one mapping or enable standard mappings.`,
+      configPath,
+    );
+  }
+  const notionIgnore = cfg.useStandardMappings
+    ? [...STANDARD_NOTION_IGNORE, ...cfg.notionIgnore]
+    : cfg.notionIgnore;
+  const localIgnore = cfg.useStandardMappings
+    ? [...STANDARD_LOCAL_IGNORE, ...cfg.localIgnore]
+    : cfg.localIgnore;
+  return { ...cfg, mappings, notionIgnore, localIgnore };
 }

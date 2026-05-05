@@ -95,6 +95,46 @@ program
   });
 
 program
+  .command('resolve')
+  .description(
+    'Print the effective merged config (repo + STANDARD_MAPPINGS). Offline — no Notion calls.',
+  )
+  .option('--repo <path>', 'project repo root', process.cwd())
+  .option('--json', 'Emit JSON instead of human-readable text')
+  .action(async (opts: { repo: string; json?: boolean }) => {
+    const repoRoot = path.resolve(opts.repo);
+    const config = await loadConfigOrDie(repoRoot);
+    if (opts.json) {
+      console.log(JSON.stringify(config, null, 2));
+      return;
+    }
+    console.log(`teamspaceId: ${config.notion.teamspaceId}`);
+    console.log(`rootPageId:  ${config.notion.rootPageId}`);
+    console.log(`useStandardMappings: ${config.useStandardMappings}`);
+    console.log(`defaultDirection: ${config.defaultDirection}`);
+    console.log(`commitStrategy:   ${config.commitStrategy}`);
+    console.log(`conflictPolicy:   ${config.conflictPolicy}`);
+    console.log('');
+    console.log(`mappings (${config.mappings.length}):`);
+    for (const m of config.mappings) {
+      const flags = [
+        m.optional ? 'optional' : '',
+        m.disabled ? 'DISABLED' : '',
+        m.direction ? `direction=${m.direction}` : '',
+        m.commitStrategy ? `commit=${m.commitStrategy}` : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      console.log(
+        `  [${m.type}] ${m.notion ?? m.notionId} → .volt/${m.local}${flags ? '  (' + flags + ')' : ''}`,
+      );
+    }
+    console.log('');
+    console.log(`notionIgnore: ${JSON.stringify(config.notionIgnore)}`);
+    console.log(`localIgnore:  ${JSON.stringify(config.localIgnore)}`);
+  });
+
+program
   .command('routes')
   .description('Print mappings classified by commitStrategy as JSON (used by GH Actions)')
   .option('--repo <path>', 'project repo root', process.cwd())
@@ -109,7 +149,7 @@ program
       const strategy = m.commitStrategy ?? config.commitStrategy;
       const pathPattern = `.volt/${m.local}/**`;
       if (strategy === 'pr') {
-        pr.push({ name: m.notion ?? m.notionId ?? m.local, paths: [pathPattern] });
+        pr.push({ name: m.notion ?? m.notionId ?? m.local ?? '<unnamed>', paths: [pathPattern] });
       } else {
         direct.push(pathPattern);
       }

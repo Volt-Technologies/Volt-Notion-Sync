@@ -16,11 +16,21 @@ export const MappingSchema = z
   .object({
     notion: z.string().optional(),
     notionId: z.string().optional(),
-    local: z.string().min(1),
-    type: MappingType.default('page'),
+    // `local` is optional in repo overrides — a repo entry with only
+    // `notion: "Process Flows"` and `disabled: true` (or just a property
+    // override) inherits `local` from the matching standard mapping.
+    local: z.string().min(1).optional(),
+    // Left optional with no default — repo overrides that omit `type`
+    // inherit from the matching standard mapping. Pure-repo extras get
+    // 'page' filled in by mergeMappings.
+    type: MappingType.optional(),
     direction: Direction.optional(),
     commitStrategy: CommitStrategy.optional(),
     optional: z.boolean().default(false),
+    // Skip this standard mapping entirely. Repos use this to opt out of
+    // a single mapping while still inheriting the rest. Has no effect on
+    // mappings the repo defines from scratch.
+    disabled: z.boolean().default(false),
   })
   .refine((m) => Boolean(m.notion || m.notionId), {
     message: 'each mapping must specify either `notion` (name) or `notionId` (uuid)',
@@ -37,6 +47,10 @@ export const MarkdownOptions = z
 
 export type MarkdownOptions = z.infer<typeof MarkdownOptions>;
 
+// Schema as it appears in `.volt/.volt-sync.yml` — what users write.
+// `mappings` is optional because the standard mappings (baked into the
+// CLI) cover most of what a repo needs; a repo can be entirely empty of
+// custom mappings and still pull successfully.
 export const ConfigSchema = z.object({
   version: z.literal(1),
   notion: z.object({
@@ -46,7 +60,12 @@ export const ConfigSchema = z.object({
   defaultDirection: Direction.default('both'),
   commitStrategy: CommitStrategy.default('direct'),
   conflictPolicy: ConflictPolicy.default('abort'),
-  mappings: z.array(MappingSchema).min(1),
+  mappings: z.array(MappingSchema).default([]),
+  // Pull in the CLI's STANDARD_MAPPINGS (Process Flows, Waterfall Tasks,
+  // Project Definition, Meetings — all marked optional). Repos override
+  // by `notion:` name in their `mappings` list, or skip individually via
+  // `disabled: true`. Set this to false if a repo wants full control.
+  useStandardMappings: z.boolean().default(true),
   notionIgnore: z.array(z.string()).default([]),
   localIgnore: z.array(z.string()).default([]),
   markdown: MarkdownOptions,
@@ -54,7 +73,12 @@ export const ConfigSchema = z.object({
 
 export type Config = z.infer<typeof ConfigSchema>;
 
-export interface ResolvedMapping extends Mapping {
+// After merge + resolution, `local` is always populated (standard
+// mappings carry their own; overrides inherit from standard; pure repo
+// entries are validated at load time). Narrow the type so downstream
+// code doesn't have to keep guarding for undefined.
+export interface ResolvedMapping extends Omit<Mapping, 'local'> {
+  local: string;
   resolvedNotionId: string;
   resolvedDirection: Direction;
   resolvedCommitStrategy: CommitStrategy;

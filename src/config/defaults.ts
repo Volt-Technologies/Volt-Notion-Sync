@@ -1,4 +1,135 @@
-import type { Config } from './types.js';
+import type { Mapping } from './types.js';
+
+// Canonical Quickstart mappings — pages and databases that exist as
+// children of the Project Home page in every standard Volt customer
+// project. Baked into the CLI so consumer repos don't have to copy them
+// into every `.volt-sync.yml`. All marked `optional: true` so a repo
+// where one of them isn't configured yet doesn't fail the run.
+//
+// Repos override individual entries by listing the same `notion:` name
+// in their own `mappings:` array. Set `disabled: true` on an override
+// to skip a standard mapping entirely; set `useStandardMappings: false`
+// at the top level to opt out of all of them.
+//
+// Verified against White & Warren's Project Home tree (2026-05-05).
+export const STANDARD_MAPPINGS: Mapping[] = [
+  {
+    notion: 'Process Flows',
+    local: 'docs/process-flows',
+    type: 'page',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Waterfall Tasks',
+    local: 'projectmanagement/waterfall-tasks',
+    type: 'page',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Project Definition',
+    local: 'docs/project-definition',
+    type: 'page',
+    optional: true,
+    disabled: false,
+  },
+  {
+    notion: 'Meetings',
+    local: 'projectmanagement/meetings',
+    type: 'database',
+    optional: true,
+    disabled: false,
+  },
+];
+
+// Standard items the CLI always ignores on pull/push. Concatenated with
+// repo-defined entries (no de-dup needed; minimatch handles overlap).
+export const STANDARD_NOTION_IGNORE: string[] = ['Settings', 'Task Execution Log'];
+
+export const STANDARD_LOCAL_IGNORE: string[] = [
+  '**/*.al',
+  '**/*.json',
+  '**/*.csv',
+  '**/.gitkeep',
+  '.sync-state.json',
+];
+
+// Merge the standard mappings into the repo-defined list.
+//
+// Matching rule: a repo entry matches a standard when their `notion:`
+// names match AND either (a) the repo entry omits `type`, or (b) the
+// repo's `type` equals the standard's. This lets a repo override
+// "Meetings" (a standard database) with just `notion: "Meetings",
+// notionId: ...` (inheriting type=database), while still allowing the
+// repo to declare a separate "Meetings" page as a pure extra by writing
+// `type: page` explicitly.
+//
+// Override fields beat standard fields where present; missing fields
+// inherit. `disabled: true` drops the standard from the resolved list.
+// Pure repo extras pass through and get type='page' if unspecified.
+export function mergeMappings(
+  repo: Mapping[],
+  useStandard: boolean,
+): Mapping[] {
+  if (!useStandard) {
+    return repo.map(fillTypeDefault);
+  }
+
+  const out: Mapping[] = [];
+  const overridesByStdNotion = new Map<string, Mapping>();
+  const repoExtras: Mapping[] = [];
+
+  for (const m of repo) {
+    const std = m.notion
+      ? STANDARD_MAPPINGS.find(
+          (s) => s.notion === m.notion && (m.type === undefined || s.type === m.type),
+        )
+      : undefined;
+    if (std) {
+      overridesByStdNotion.set(std.notion!, m);
+    } else {
+      if (!m.local) {
+        throw new Error(
+          `Repo-defined mapping "${m.notion ?? m.notionId}" must specify \`local:\` ` +
+            `(it doesn't match any standard mapping to inherit from).`,
+        );
+      }
+      repoExtras.push(fillTypeDefault(m));
+    }
+  }
+
+  for (const std of STANDARD_MAPPINGS) {
+    const override = overridesByStdNotion.get(std.notion!);
+    if (!override) {
+      out.push(std);
+      continue;
+    }
+    if (override.disabled) continue;
+    out.push({
+      ...std,
+      ...stripUndefined(override),
+      // Inherit `local` and `type` from standard when override omits them
+      local: override.local ?? std.local,
+      type: override.type ?? std.type,
+    });
+  }
+
+  out.push(...repoExtras);
+  return out;
+}
+
+function fillTypeDefault(m: Mapping): Mapping {
+  return m.type === undefined ? { ...m, type: 'page' } : m;
+}
+
+function stripUndefined<T extends object>(o: T): Partial<T> {
+  const r: Partial<T> = {};
+  for (const [k, v] of Object.entries(o) as [keyof T, T[keyof T]][]) {
+    if (v !== undefined) r[k] = v;
+  }
+  return r;
+}
 
 export const WORKFLOW_TEMPLATE_YAML = `name: Volt Notion Sync
 
@@ -148,93 +279,30 @@ jobs:
             --body "Automated PR for review-required Notion mappings (commitStrategy: pr)."
 `;
 
+// Slim seed config: only what each project must specify itself. The
+// CLI's STANDARD_MAPPINGS supply Process Flows, Waterfall Tasks, Project
+// Definition, and Meetings (all optional) — repos override individually
+// or skip with \`disabled: true\`. To add custom mappings the standard
+// set doesn't cover, append to the empty mappings list. To debug what
+// actually runs, use \`volt-notion-sync inspect --resolve\`.
 export const QUICKSTART_TEMPLATE_YAML = `version: 1
+
 notion:
   teamspaceId: REPLACE_WITH_TEAMSPACE_UUID
-  rootPageId: REPLACE_WITH_PROJECT_HOME_PAGE_UUID
+  rootPageId:  REPLACE_WITH_PROJECT_HOME_PAGE_UUID
 
-defaultDirection: both
-commitStrategy: direct
-conflictPolicy: abort
+# Standard mappings (Process Flows, Waterfall Tasks, Project Definition,
+# Meetings) come from the CLI — see STANDARD_MAPPINGS in
+# Volt-Notion-Sync/src/config/defaults.ts. To override one, list it here
+# with the same \`notion:\` name and any fields you want to change. To
+# skip one entirely, list it with \`disabled: true\`. Set
+# \`useStandardMappings: false\` at the top level for full opt-out.
+mappings: []
 
-mappings:
-  - notion: "Process Flows"
-    local: docs/process-flows
-  - notion: "Waterfall Tasks"
-    local: projectmanagement/waterfall-tasks
-  - notion: "Project Definition"
-    local: docs/project-definition
-  - notion: "Features"
-    local: docs/features
-    optional: true
-  - notion: "Resources"
-    local: docs/resources
-  - notion: "Miscellaneous"
-    local: docs/misc
-
-  - notion: "Meetings"
-    local: projectmanagement/meetings
-    type: database
-  - notion: "PM Tasks"
-    local: projectmanagement/pm-tasks
-    type: database
-    commitStrategy: pr
-    direction: pull
-
-notionIgnore:
-  - "Settings"
-  - "Task Execution Log"
-
-localIgnore:
-  - implementation/**
-  - powerbi/**
-  - tools/**
-  - "**/*.al"
-  - "**/*.json"
-  - "**/*.csv"
-  - "**/.gitkeep"
-  - .sync-state.json
-
-markdown:
-  frontmatter: true
-  attachments: .attachments
+# Repo-specific notionIgnore/localIgnore are CONCATENATED with the
+# CLI's STANDARD_NOTION_IGNORE / STANDARD_LOCAL_IGNORE — no need to
+# repeat the standard entries.
+notionIgnore: []
+localIgnore: []
 `;
 
-export function makeDefaultConfig(teamspaceId: string, rootPageId: string): Config {
-  return {
-    version: 1,
-    notion: { teamspaceId, rootPageId },
-    defaultDirection: 'both',
-    commitStrategy: 'direct',
-    conflictPolicy: 'abort',
-    mappings: [
-      { notion: 'Process Flows', local: 'docs/process-flows', type: 'page', optional: false },
-      { notion: 'Waterfall Tasks', local: 'projectmanagement/waterfall-tasks', type: 'page', optional: false },
-      { notion: 'Project Definition', local: 'docs/project-definition', type: 'page', optional: false },
-      { notion: 'Features', local: 'docs/features', type: 'page', optional: true },
-      { notion: 'Resources', local: 'docs/resources', type: 'page', optional: false },
-      { notion: 'Miscellaneous', local: 'docs/misc', type: 'page', optional: false },
-      { notion: 'Meetings', local: 'projectmanagement/meetings', type: 'database', optional: false },
-      {
-        notion: 'PM Tasks',
-        local: 'projectmanagement/pm-tasks',
-        type: 'database',
-        commitStrategy: 'pr',
-        direction: 'pull',
-        optional: false,
-      },
-    ],
-    notionIgnore: ['Settings', 'Task Execution Log'],
-    localIgnore: [
-      'implementation/**',
-      'powerbi/**',
-      'tools/**',
-      '**/*.al',
-      '**/*.json',
-      '**/*.csv',
-      '**/.gitkeep',
-      '.sync-state.json',
-    ],
-    markdown: { frontmatter: true, attachments: '.attachments' },
-  };
-}

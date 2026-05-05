@@ -1,50 +1,19 @@
 version: 1
+
 notion:
   teamspaceId: REPLACE_WITH_TEAMSPACE_UUID
-  rootPageId: REPLACE_WITH_PROJECT_HOME_PAGE_UUID
+  rootPageId:  REPLACE_WITH_PROJECT_HOME_PAGE_UUID
 
-defaultDirection: both
-commitStrategy: direct
-conflictPolicy: abort
+# Standard mappings (Process Flows, Waterfall Tasks, Project Definition,
+# Meetings) come from the CLI — see STANDARD_MAPPINGS in
+# Volt-Notion-Sync/src/config/defaults.ts. To override one, list it here
+# with the same `notion:` name and any fields you want to change. To
+# skip one entirely, list it with `disabled: true`. Set
+# `useStandardMappings: false` at the top level for full opt-out.
+mappings: []
 
-mappings:
-  - notion: "Process Flows"
-    local: docs/process-flows
-  - notion: "Waterfall Tasks"
-    local: projectmanagement/waterfall-tasks
-  - notion: "Project Definition"
-    local: docs/project-definition
-  - notion: "Features"
-    local: docs/features
-    optional: true
-  - notion: "Resources"
-    local: docs/resources
-  - notion: "Miscellaneous"
-    local: docs/misc
-
-  - notion: "Meetings"
-    local: projectmanagement/meetings
-    type: database
-  - notion: "PM Tasks"
-    local: projectmanagement/pm-tasks
-    type: database
-    commitStrategy: pr
-    direction: pull
-
-notionIgnore:
-  - "Settings"
-  - "Task Execution Log"
-
-localIgnore:
-  - implementation/**
-  - powerbi/**
-  - tools/**
-  - "**/*.al"
-  - "**/*.json"
-  - "**/*.csv"
-  - "**/.gitkeep"
-  - .sync-state.json
-
-markdown:
-  frontmatter: true
-  attachments: .attachments
+# Repo-specific notionIgnore/localIgnore are CONCATENATED with the
+# CLI's STANDARD_NOTION_IGNORE / STANDARD_LOCAL_IGNORE — no need to
+# repeat the standard entries.
+notionIgnore: []
+localIgnore: []

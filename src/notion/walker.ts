@@ -68,15 +68,57 @@ export async function listChildBlocks(client: Client, blockId: string): Promise<
   return out;
 }
 
-async function listChildPageIds(client: Client, pageId: string): Promise<string[]> {
-  const blocks = await listChildBlocks(client, pageId);
-  const ids: string[] = [];
-  for (const b of blocks) {
-    if (b.type === 'child_page' && !b.archived && !b.in_trash) {
-      ids.push(b.id);
+// Quickstart Project Home pages organise child pages inside callouts /
+// columns / toggles for visual layout. Notion stores those sub-pages as
+// child_page blocks whose parent is the container, not the page itself —
+// so a flat blocks.children.list against the page misses them. This helper
+// descends through layout containers to surface every child_page /
+// child_database the page actually holds.
+const RECURSE_INTO_TYPES = new Set([
+  'column_list',
+  'column',
+  'callout',
+  'toggle',
+  'synced_block',
+]);
+
+export interface NamedChildBlock {
+  id: string;
+  title: string;
+  kind: 'page' | 'database';
+}
+
+export async function collectNamedChildren(
+  client: Client,
+  parentBlockId: string,
+  maxDepth = 8,
+): Promise<NamedChildBlock[]> {
+  const out: NamedChildBlock[] = [];
+  const seen = new Set<string>();
+
+  async function visit(blockId: string, depth: number): Promise<void> {
+    if (depth > maxDepth || seen.has(blockId)) return;
+    seen.add(blockId);
+    const blocks = await listChildBlocks(client, blockId);
+    for (const b of blocks) {
+      if (b.archived || b.in_trash) continue;
+      if (b.type === 'child_page' && b.child_page?.title) {
+        out.push({ id: b.id, title: b.child_page.title, kind: 'page' });
+      } else if (b.type === 'child_database' && b.child_database?.title) {
+        out.push({ id: b.id, title: b.child_database.title, kind: 'database' });
+      } else if (RECURSE_INTO_TYPES.has(b.type) && b.has_children) {
+        await visit(b.id, depth + 1);
+      }
     }
   }
-  return ids;
+
+  await visit(parentBlockId, 0);
+  return out;
+}
+
+async function listChildPageIds(client: Client, pageId: string): Promise<string[]> {
+  const named = await collectNamedChildren(client, pageId);
+  return named.filter((c) => c.kind === 'page').map((c) => c.id);
 }
 
 export async function fetchPageNode(
