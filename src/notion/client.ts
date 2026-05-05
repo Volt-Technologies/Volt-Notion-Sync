@@ -1,4 +1,9 @@
-import { Client, APIResponseError, RequestTimeoutError } from '@notionhq/client';
+import {
+  Client,
+  APIResponseError,
+  RequestTimeoutError,
+  UnknownHTTPResponseError,
+} from '@notionhq/client';
 
 export interface NotionClientOptions {
   token: string;
@@ -17,27 +22,12 @@ export function createNotionClient(opts: NotionClientOptions): Client {
     timeoutMs: 120_000,
   });
 
-  // Patch every HTTP-issuing method to retry transient failures. We
-  // wrap both the raw `request` (used by database.ts) and the typed
-  // accessors that walker / resolver call (pages.retrieve,
-  // blocks.children.list, search). Wrapping `request` alone isn't
-  // enough — the typed methods may be bound to the SDK's internal
-  // implementation rather than going through `this.request`.
+  // The SDK's typed methods (pages.retrieve, blocks.children.list,
+  // search, etc.) all funnel through `client.request`. Patching it
+  // once retries every HTTP call without double-wrapping.
   const origRequest = client.request.bind(client) as (args: unknown) => Promise<unknown>;
   (client as unknown as { request: typeof origRequest }).request = (args: unknown) =>
     withRetry(() => origRequest(args));
-
-  const origPagesRetrieve = client.pages.retrieve.bind(client.pages);
-  client.pages.retrieve = ((args: Parameters<typeof origPagesRetrieve>[0]) =>
-    withRetry(() => origPagesRetrieve(args))) as typeof client.pages.retrieve;
-
-  const origBlocksList = client.blocks.children.list.bind(client.blocks.children);
-  client.blocks.children.list = ((args: Parameters<typeof origBlocksList>[0]) =>
-    withRetry(() => origBlocksList(args))) as typeof client.blocks.children.list;
-
-  const origSearch = client.search.bind(client);
-  client.search = ((args: Parameters<typeof origSearch>[0]) =>
-    withRetry(() => origSearch(args))) as typeof client.search;
 
   return client;
 }
@@ -57,6 +47,13 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
       lastErr = err;
       const delay = Math.min(MAX_DELAY_MS, BASE_DELAY_MS * 2 ** (attempt - 1));
       const jitter = Math.floor(Math.random() * 250);
+      // Make retries observable in CI logs so a slow/rate-limited
+      // run doesn't look silently stuck.
+      const code = (err as { code?: string }).code ?? (err as Error).name;
+      console.error(
+        `[notion-retry] attempt ${attempt}/${MAX_ATTEMPTS} failed (${code}); ` +
+          `retrying in ${delay + jitter}ms`,
+      );
       await sleep(delay + jitter);
     }
   }
@@ -68,6 +65,11 @@ function isTransient(err: unknown): boolean {
   if (err instanceof APIResponseError) {
     if (TRANSIENT_HTTP_STATUSES.has(err.status)) return true;
     if (err.code === 'rate_limited') return true;
+  }
+  // 5xx responses without a JSON body (e.g. CDN 502/504) come through
+  // as UnknownHTTPResponseError, not APIResponseError.
+  if (err instanceof UnknownHTTPResponseError) {
+    if (TRANSIENT_HTTP_STATUSES.has(err.status)) return true;
   }
   return false;
 }
