@@ -6,7 +6,7 @@ import type { Config, ResolvedMapping } from '../config/types.js';
 import { walkPageTree, type NotionPageNode } from '../notion/walker.js';
 import { pageBlocksToMarkdown, slugify } from '../notion/blocksToMarkdown.js';
 import { exportDatabase, type DatabaseExport, type NormalizedRow } from '../notion/database.js';
-import { isIgnoredNotion } from '../mapping/glob.js';
+import { isIgnoredNotion, matchesAny } from '../mapping/glob.js';
 import { hashContent, loadState, saveState, type SyncState } from './state.js';
 import { detectConflicts, applyConflictPolicy, formatConflicts, type Conflict } from './conflict.js';
 
@@ -78,7 +78,13 @@ export async function pull(opts: PullOptions): Promise<PullResult> {
     }
   }
 
-  result.filesDeleted = await pruneStale(opts.repoRoot, opts.mappings, writtenPaths, log);
+  result.filesDeleted = await pruneStale(
+    opts.repoRoot,
+    opts.mappings,
+    writtenPaths,
+    opts.config.localIgnore,
+    log,
+  );
 
   state.lastPullAt = new Date().toISOString();
   await saveState(opts.repoRoot, state);
@@ -302,8 +308,10 @@ async function pruneStale(
   repoRoot: string,
   mappings: ResolvedMapping[],
   writtenPaths: Set<string>,
+  localIgnore: string[],
   log: (msg: string) => void,
 ): Promise<number> {
+  const voltRoot = path.join(repoRoot, '.volt');
   let deleted = 0;
   for (const mapping of mappings) {
     if (mapping.resolvedDirection === 'push') continue;
@@ -316,6 +324,13 @@ async function pruneStale(
         const base = path.basename(f);
         if (base === '.gitkeep' || base === '_index.json') continue;
         if (!f.endsWith('.md')) continue;
+        // Honor localIgnore — files matching these patterns are
+        // repo-only artifacts (test reports, etc.) that aren't sourced
+        // from Notion and shouldn't be pruned even when they sit inside
+        // a mapped folder. Pattern is matched against the .volt-relative
+        // path with forward slashes (minimatch convention).
+        const relFromVolt = path.relative(voltRoot, f).split(path.sep).join('/');
+        if (matchesAny(relFromVolt, localIgnore)) continue;
         await rm(f, { force: true });
         log(`  pruned: ${path.relative(repoRoot, f)}`);
         deleted += 1;

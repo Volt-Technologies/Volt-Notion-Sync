@@ -4,6 +4,17 @@ interface RawDatabase {
   id: string;
   title?: Array<{ plain_text?: string }>;
   data_sources?: Array<{ id: string; name?: string }>;
+  is_inline?: boolean;
+  parent?: { type: string; page_id?: string; database_id?: string };
+}
+
+interface SearchResult {
+  results: Array<{
+    id: string;
+    object: string;
+    parent?: { type: string; database_id?: string };
+    title?: Array<{ plain_text?: string }>;
+  }>;
 }
 
 interface RawDataSource {
@@ -64,15 +75,39 @@ export async function exportDatabase(client: Client, databaseId: string): Promis
     path: `databases/${databaseId}`,
     method: 'get',
   })) as RawDatabase;
-  const dataSourceId = db.data_sources?.[0]?.id;
+  let dataSourceId = db.data_sources?.[0]?.id;
   if (!dataSourceId) {
-    throw new Error(
-      `Database ${databaseId} has no usable data source. ` +
-        `data_sources field value: ${JSON.stringify(db.data_sources)}. ` +
-        `If empty/null, the integration may need to be re-shared with the database ` +
-        `at the data-source level, or the database may be a linked/synced reference ` +
-        `(no data source of its own).`,
-    );
+    // Inline databases on a page (e.g. a Quickstart Project Home's
+    // "Meetings" widget) are linked views — they have empty data_sources
+    // and the canonical DB lives elsewhere. Search by title and pick the
+    // unique canonical match.
+    const title = db.title?.[0]?.plain_text;
+    if (!title) {
+      throw new Error(
+        `Database ${databaseId} has empty data_sources and no title to search by. ` +
+          `Set notionId in .volt-sync.yml to the canonical database (not its inline view).`,
+      );
+    }
+    const candidates = await findCanonicalCandidates(client, title);
+    if (candidates.length === 0) {
+      throw new Error(
+        `Database ${databaseId} ("${title}") looks like an inline reference (data_sources: []) ` +
+          `and no canonical "${title}" data source was found via search. ` +
+          `Either share the canonical database with this integration in Notion, ` +
+          `or set notionId directly to the canonical database UUID in .volt-sync.yml.`,
+      );
+    }
+    if (candidates.length > 1) {
+      const list = candidates
+        .map((c) => `    - data source ${c.dataSourceId}  (parent database ${c.parentDbId})`)
+        .join('\n');
+      throw new Error(
+        `Database ${databaseId} ("${title}") is an inline reference and multiple canonical ` +
+          `"${title}" data sources exist:\n${list}\n` +
+          `Set notionId in .volt-sync.yml to the parent database UUID of the one you want.`,
+      );
+    }
+    dataSourceId = candidates[0]!.dataSourceId;
   }
   const ds = (await fetchDataSource(client, dataSourceId)) as RawDataSource;
   const rows = await queryAllRows(client, dataSourceId);
@@ -87,6 +122,29 @@ export async function exportDatabase(client: Client, databaseId: string): Promis
 async function fetchDataSource(client: Client, dataSourceId: string): Promise<RawDataSource> {
   const c = client as unknown as { request: (args: unknown) => Promise<unknown> };
   return (await c.request({ path: `data_sources/${dataSourceId}`, method: 'get' })) as RawDataSource;
+}
+
+// Search the workspace for data sources whose name exactly matches
+// `title`. Caller decides what to do with 0, 1, or many results.
+async function findCanonicalCandidates(
+  client: Client,
+  title: string,
+): Promise<Array<{ dataSourceId: string; parentDbId: string }>> {
+  const c = client as unknown as {
+    search: (args: unknown) => Promise<SearchResult>;
+  };
+  const res = await c.search({
+    query: title,
+    filter: { property: 'object', value: 'data_source' },
+  });
+  return res.results
+    .filter(
+      (r) =>
+        r.object === 'data_source' &&
+        (r.title?.[0]?.plain_text ?? '').trim() === title.trim() &&
+        r.parent?.database_id,
+    )
+    .map((r) => ({ dataSourceId: r.id, parentDbId: r.parent!.database_id! }));
 }
 
 async function queryAllRows(client: Client, dataSourceId: string): Promise<RawRow[]> {
