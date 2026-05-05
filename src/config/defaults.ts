@@ -42,9 +42,12 @@ export const STANDARD_MAPPINGS: Mapping[] = [
     disabled: false,
   },
   // ── Databases (canonical, under Settings → Databases) ─────────────
-  // Database rows for "Waterfall Tasks" land alongside the page tree
-  // (rows are siblings to the sub-page folders like extensions/,
-  // issues/, etc.). Other DBs get their own folders.
+  // Waterfall Tasks rows are grouped into Type-named subfolders
+  // (extension/, migration/, integration/, reports/, training/) by the
+  // canonical "Type" select property. The Volt platform reads each
+  // type's rows directly from its subfolder — no per-file Type filter
+  // needed. Stage artifacts (FDD, TDD, documentation, test-report) live
+  // in a sibling <slug>/ folder inside the same group.
   {
     notion: 'Meetings',
     local: 'projectmanagement/meetings',
@@ -58,10 +61,6 @@ export const STANDARD_MAPPINGS: Mapping[] = [
     type: 'database',
     optional: true,
     disabled: false,
-    // Group rows by the canonical "Type" select property so Extensions
-    // / Migrations / Integrations / Reports / Training rows land in
-    // separate subfolders next to the matching page-tree section
-    // index.md files (extensions/, migrations/, etc.).
     groupByProperty: 'Type',
   },
   {
