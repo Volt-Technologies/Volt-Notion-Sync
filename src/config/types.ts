@@ -31,6 +31,12 @@ export const MappingSchema = z
     // a single mapping while still inheriting the rest. Has no effect on
     // mappings the repo defines from scratch.
     disabled: z.boolean().default(false),
+    // Database mappings only: name of a Notion property whose value
+    // becomes the per-row subfolder. Rows with property = "Extension"
+    // land at <local>/extension/<row-slug>.md, etc. Supports select,
+    // multi_select (first option), status, and rich_text properties.
+    // Unset or property missing → flat layout under <local>/.
+    groupByProperty: z.string().optional(),
   })
   .refine((m) => Boolean(m.notion || m.notionId), {
     message: 'each mapping must specify either `notion` (name) or `notionId` (uuid)',

@@ -217,6 +217,12 @@ async function pullEmbeddedDatabase(
   log(`    embedded db → ${baseFolder}: ${rowsWritten} row(s)`);
 }
 
+// Note: embedded DBs intentionally don't honor groupByProperty —
+// they're discovered automatically from page blocks and don't have a
+// mapping config attached. If a project needs grouping for a specific
+// embedded DB, the user can promote it to an explicit mapping in
+// .volt-sync.yml.
+
 async function pullDatabase(
   opts: PullOptions,
   mapping: ResolvedMapping,
@@ -247,7 +253,16 @@ async function pullDatabase(
     if (isIgnoredNotion([row.title], opts.config.notionIgnore)) continue;
     if (skipIds.has(row.id)) continue;
     const rowSlug = slugify(row.title || row.id);
-    const fileRel = path.posix.join(mapping.local, rowSlug + '.md');
+    // groupByProperty (e.g. "Type") sorts rows into subfolders by the
+    // property's value — so a Waterfall Tasks row with Type=Extension
+    // lands at projectmanagement/waterfall-tasks/extension/<slug>.md
+    // instead of mixed flat with Migrations/Integrations/etc.
+    const groupSlug = rowGroupSlug(row, mapping.groupByProperty);
+    const fileRel = path.posix.join(
+      mapping.local,
+      ...(groupSlug ? [groupSlug] : []),
+      rowSlug + '.md',
+    );
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
     const body = await pageBlocksToMarkdown(opts.client, row.id);
     const content = renderRowMarkdown(opts.config, row, exp, body);
@@ -264,12 +279,13 @@ async function pullDatabase(
 
     // Recursively pull any child pages of this row. Each becomes a nested
     // markdown file beside the row at projectmanagement/<db>/<row-slug>/...
-    // Skips the row itself (it's already written above).
+    // (or under the group folder if groupByProperty is set).
     const childPagesWritten = await pullRowChildPages(
       opts,
       mapping,
       row,
       rowSlug,
+      groupSlug,
       state,
       writtenPaths,
       skipIds,
@@ -282,11 +298,36 @@ async function pullDatabase(
   return { rowsWritten };
 }
 
+// Read the configured groupByProperty value from a row. Supports the
+// common Notion property types (select, multi_select, status,
+// rich_text). Returns the slugified folder segment, or undefined when
+// the property is missing/empty — caller falls back to flat layout.
+function rowGroupSlug(row: NormalizedRow, propName: string | undefined): string | undefined {
+  if (!propName) return undefined;
+  const p = (row.rawProperties as Record<string, unknown>)[propName] as
+    | { type?: string;
+        select?: { name?: string } | null;
+        multi_select?: Array<{ name?: string }>;
+        status?: { name?: string } | null;
+        rich_text?: Array<{ plain_text?: string }>;
+      }
+    | undefined;
+  if (!p) return undefined;
+  let raw: string | undefined;
+  if (p.type === 'select') raw = p.select?.name;
+  else if (p.type === 'multi_select') raw = p.multi_select?.[0]?.name;
+  else if (p.type === 'status') raw = p.status?.name;
+  else if (p.type === 'rich_text') raw = p.rich_text?.[0]?.plain_text;
+  if (!raw || !raw.trim()) return undefined;
+  return slugify(raw);
+}
+
 async function pullRowChildPages(
   opts: PullOptions,
   mapping: ResolvedMapping,
   row: NormalizedRow,
   rowSlug: string,
+  groupSlug: string | undefined,
   state: SyncState,
   writtenPaths: Set<string>,
   skipIds: Set<string>,
@@ -309,6 +350,7 @@ async function pullRowChildPages(
     const intermediate = node.parentPath.slice(1).map((s) => slugify(s, { preserveCase: true }));
     const fileRel = path.posix.join(
       mapping.local,
+      ...(groupSlug ? [groupSlug] : []),
       rowSlug,
       ...intermediate,
       slugify(node.title, { preserveCase: true }) + '.md',

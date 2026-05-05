@@ -58,6 +58,11 @@ export const STANDARD_MAPPINGS: Mapping[] = [
     type: 'database',
     optional: true,
     disabled: false,
+    // Group rows by the canonical "Type" select property so Extensions
+    // / Migrations / Integrations / Reports / Training rows land in
+    // separate subfolders next to the matching page-tree section
+    // index.md files (extensions/, migrations/, etc.).
+    groupByProperty: 'Type',
   },
   {
     notion: 'Issues',
