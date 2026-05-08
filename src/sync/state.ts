@@ -7,6 +7,12 @@ export interface SyncStateEntry {
   localPath: string;
   notionLastEditedTime: string;
   contentHash: string;
+  // Full rendered file content from the last successful sync. Required
+  // by the merge-prefer-notion conflict policy as the common ancestor
+  // for `git merge-file`. Optional so state files written by older CLI
+  // versions still load — a missing baseContent forces notion-wins on
+  // that entry until the next pull repopulates it.
+  baseContent?: string;
 }
 
 export interface SyncState {

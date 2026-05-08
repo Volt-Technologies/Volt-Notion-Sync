@@ -101,11 +101,13 @@ async function pushPage(
     });
     result.pagesUpdated += 1;
     log(`  page updated: ${file.relPath}`);
+    const onDisk = await readFile(file.absPath, 'utf-8');
     state.entries[parsed.notionId] = {
       notionId: parsed.notionId,
       localPath: file.relPath,
       notionLastEditedTime: new Date().toISOString(),
-      contentHash: hashContent(await readFile(file.absPath, 'utf-8')),
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk,
     };
   } else {
     const created = await opts.client.pages.create({
@@ -117,11 +119,13 @@ async function pushPage(
     await writeBackId(file.absPath, newId, (created as { url?: string }).url ?? '');
     result.pagesCreated += 1;
     log(`  page created: ${file.relPath} → ${newId}`);
+    const onDisk = await readFile(file.absPath, 'utf-8');
     state.entries[newId] = {
       notionId: newId,
       localPath: file.relPath,
       notionLastEditedTime: new Date().toISOString(),
-      contentHash: hashContent(await readFile(file.absPath, 'utf-8')),
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk,
     };
   }
 }
@@ -151,11 +155,13 @@ async function pushDatabaseRow(
     }
     result.rowsUpdated += 1;
     log(`  row updated: ${file.relPath} (${blocks.length} blocks)`);
+    const onDisk = await readFile(file.absPath, 'utf-8');
     state.entries[parsed.notionId] = {
       notionId: parsed.notionId,
       localPath: file.relPath,
       notionLastEditedTime: new Date().toISOString(),
-      contentHash: hashContent(await readFile(file.absPath, 'utf-8')),
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk,
     };
   } else {
     const c = opts.client as unknown as { request: (a: unknown) => Promise<{ id: string; url?: string }> };
@@ -167,11 +173,13 @@ async function pushDatabaseRow(
     await writeBackId(file.absPath, created.id, created.url ?? '');
     result.rowsCreated += 1;
     log(`  row created: ${file.relPath} → ${created.id} (${blocks.length} blocks)`);
+    const onDisk = await readFile(file.absPath, 'utf-8');
     state.entries[created.id] = {
       notionId: created.id,
       localPath: file.relPath,
       notionLastEditedTime: new Date().toISOString(),
-      contentHash: hashContent(await readFile(file.absPath, 'utf-8')),
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk,
     };
   }
 }
@@ -214,11 +222,13 @@ async function pushRowChildPage(
     });
     result.pagesUpdated += 1;
     log(`  child updated: ${file.relPath} (${blocks.length} blocks)`);
+    const onDisk = await readFile(file.absPath, 'utf-8');
     state.entries[parsed.notionId] = {
       notionId: parsed.notionId,
       localPath: file.relPath,
       notionLastEditedTime: new Date().toISOString(),
-      contentHash: hashContent(await readFile(file.absPath, 'utf-8')),
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk,
     };
   } else {
     const created = await opts.client.pages.create({
@@ -230,11 +240,13 @@ async function pushRowChildPage(
     await writeBackId(file.absPath, newId, (created as { url?: string }).url ?? '');
     result.pagesCreated += 1;
     log(`  child created: ${file.relPath} → ${newId} (${blocks.length} blocks)`);
+    const onDisk = await readFile(file.absPath, 'utf-8');
     state.entries[newId] = {
       notionId: newId,
       localPath: file.relPath,
       notionLastEditedTime: new Date().toISOString(),
-      contentHash: hashContent(await readFile(file.absPath, 'utf-8')),
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk,
     };
   }
 }

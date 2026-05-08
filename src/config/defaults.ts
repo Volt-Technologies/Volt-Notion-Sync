@@ -414,6 +414,13 @@ notion:
   teamspaceId: REPLACE_WITH_TEAMSPACE_UUID
   rootPageId:  REPLACE_WITH_PROJECT_HOME_PAGE_UUID
 
+# Run a 3-way \`git merge-file\` when the same page changed in both
+# Notion and the repo since the last sync. Non-overlapping edits from
+# each side are preserved; overlapping edits resolve to Notion's
+# version. The alternative ('abort') aborts the GitHub Action when
+# anything conflicts, which blocks the sync until a human intervenes.
+conflictPolicy: merge-prefer-notion
+
 # Standard mappings (Process Flows, Waterfall Tasks, Project Definition,
 # Meetings) come from the CLI — see STANDARD_MAPPINGS in
 # Volt-Notion-Sync/src/config/defaults.ts. To override one, list it here

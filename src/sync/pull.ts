@@ -1,4 +1,4 @@
-import { mkdir, writeFile, rm, readdir, stat } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, rm, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import YAML from 'yaml';
 import type { Client } from '@notionhq/client';
@@ -9,6 +9,7 @@ import { exportDatabase, type DatabaseExport, type NormalizedRow } from '../noti
 import { isIgnoredNotion, matchesAny } from '../mapping/glob.js';
 import { hashContent, loadState, saveState, type SyncState } from './state.js';
 import { detectConflicts, applyConflictPolicy, formatConflicts, type Conflict } from './conflict.js';
+import { mergePreferNotion } from './merge.js';
 
 
 export interface PullOptions {
@@ -48,15 +49,23 @@ export async function pull(opts: PullOptions): Promise<PullResult> {
   });
   const { aborted } = applyConflictPolicy(opts.config.conflictPolicy, conflicts);
   if (aborted.length > 0) {
-    log(`conflict: ${aborted.length} entries — policy=abort`);
-    log(formatConflicts(aborted));
-    result.conflicts = aborted;
-    throw new Error(`Aborting pull due to ${aborted.length} conflict(s):\n${formatConflicts(aborted)}`);
+    // Throwing already prints formatConflicts to stderr; don't double-log.
+    throw new Error(
+      `Aborting pull due to ${aborted.length} conflict(s):\n${formatConflicts(aborted)}`,
+    );
   }
   result.conflicts = conflicts;
 
   const skipIds = new Set(
     opts.config.conflictPolicy === 'github-wins' ? conflicts.map((c) => c.notionId) : [],
+  );
+  // Index of both-changed conflicts the merge-prefer-notion path must
+  // resolve in-line. Other policies leave this empty so writeWithMerge
+  // is a straight passthrough.
+  const mergeMap = new Map<string, Conflict>(
+    opts.config.conflictPolicy === 'merge-prefer-notion'
+      ? conflicts.filter((c) => c.reason === 'both-changed').map((c) => [c.notionId, c])
+      : [],
   );
   const writtenPaths = new Set<string>();
 
@@ -68,12 +77,12 @@ export async function pull(opts: PullOptions): Promise<PullResult> {
     }
     if (mapping.type === 'database') {
       log(`pull database: ${mapping.notion ?? mapping.notionId} → ${mapping.local}`);
-      const dbResult = await pullDatabase(opts, mapping, state, writtenPaths, skipIds);
+      const dbResult = await pullDatabase(opts, mapping, state, writtenPaths, skipIds, mergeMap);
       result.databasesWritten += 1;
       result.rowsWritten += dbResult.rowsWritten;
     } else {
       log(`pull page tree: ${mapping.notion ?? mapping.notionId} → ${mapping.local}`);
-      const pageResult = await pullPageTree(opts, mapping, state, writtenPaths, skipIds);
+      const pageResult = await pullPageTree(opts, mapping, state, writtenPaths, skipIds, mergeMap);
       result.pagesWritten += pageResult.pagesWritten;
     }
   }
@@ -91,12 +100,56 @@ export async function pull(opts: PullOptions): Promise<PullResult> {
   return result;
 }
 
+// Resolve a single page/row write under the active conflict policy.
+// Returns the actual content that landed on disk (may differ from
+// `notionContent` when a 3-way merge succeeded). Callers MUST hash and
+// store this returned value, not the input — otherwise the next pull
+// will see the stored hash mismatch the file on disk and re-flag the
+// entry as locally-changed.
+async function writeWithMerge(
+  filePath: string,
+  notionContent: string,
+  notionId: string,
+  state: SyncState,
+  mergeMap: Map<string, Conflict>,
+  log: (m: string) => void,
+): Promise<string> {
+  const conflict = mergeMap.get(notionId);
+  if (!conflict) {
+    await writeFileEnsured(filePath, notionContent);
+    return notionContent;
+  }
+  const baseContent = state.entries[notionId]?.baseContent;
+  if (baseContent === undefined) {
+    // Legacy state from before baseContent was tracked — can't 3-way
+    // merge, so honor the policy's stated bias and take Notion. Next
+    // pull will populate baseContent and unlock real merges.
+    log(`  conflict (no base): ${conflict.localPath} → notion-wins`);
+    await writeFileEnsured(filePath, notionContent);
+    return notionContent;
+  }
+  let localContent: string;
+  try {
+    localContent = await readFile(filePath, 'utf-8');
+  } catch {
+    // File vanished between conflict detection and write — treat as
+    // missing-locally and just write Notion's version.
+    await writeFileEnsured(filePath, notionContent);
+    return notionContent;
+  }
+  const result = await mergePreferNotion(notionContent, localContent, baseContent);
+  log(`  conflict: ${conflict.localPath} → ${result.clean ? 'merged cleanly' : 'overlap, notion-wins'}`);
+  await writeFileEnsured(filePath, result.content);
+  return result.content;
+}
+
 async function pullPageTree(
   opts: PullOptions,
   mapping: ResolvedMapping,
   state: SyncState,
   writtenPaths: Set<string>,
   skipIds: Set<string>,
+  mergeMap: Map<string, Conflict>,
 ): Promise<{ pagesWritten: number }> {
   const log = opts.log ?? (() => {});
   let pagesWritten = 0;
@@ -118,15 +171,16 @@ async function pullPageTree(
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
 
     const md = await pageBlocksToMarkdown(opts.client, node.id);
-    const content = renderMarkdownFile(opts.config, node, md);
-    await writeFileEnsured(filePath, content);
+    const notionContent = renderMarkdownFile(opts.config, node, md);
+    const written = await writeWithMerge(filePath, notionContent, node.id, state, mergeMap, log);
     writtenPaths.add(path.normalize(filePath));
 
     state.entries[node.id] = {
       notionId: node.id,
       localPath: fileRel,
       notionLastEditedTime: node.lastEditedTime,
-      contentHash: hashContent(content),
+      contentHash: hashContent(written),
+      baseContent: written,
     };
 
     pagesWritten += 1;
@@ -140,7 +194,7 @@ async function pullPageTree(
       const pageFolder = path.posix.dirname(fileRel);
       const flat = node.childDatabaseIds.length === 1;
       for (const dbId of node.childDatabaseIds) {
-        await pullEmbeddedDatabase(opts, dbId, pageFolder, flat, state, writtenPaths, skipIds);
+        await pullEmbeddedDatabase(opts, dbId, pageFolder, flat, state, writtenPaths, skipIds, mergeMap);
       }
     }
   }
@@ -163,6 +217,7 @@ async function pullEmbeddedDatabase(
   state: SyncState,
   writtenPaths: Set<string>,
   skipIds: Set<string>,
+  mergeMap: Map<string, Conflict>,
 ): Promise<void> {
   const log = opts.log ?? (() => {});
   let exp: DatabaseExport;
@@ -202,15 +257,16 @@ async function pullEmbeddedDatabase(
     const fileRel = path.posix.join(baseFolder, rowSlug + '.md');
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
     const body = await pageBlocksToMarkdown(opts.client, row.id);
-    const content = renderRowMarkdown(opts.config, row, exp, body);
-    await writeFileEnsured(filePath, content);
+    const notionContent = renderRowMarkdown(opts.config, row, exp, body);
+    const written = await writeWithMerge(filePath, notionContent, row.id, state, mergeMap, opts.log ?? (() => {}));
     writtenPaths.add(path.normalize(filePath));
 
     state.entries[row.id] = {
       notionId: row.id,
       localPath: fileRel,
       notionLastEditedTime: row.lastEditedTime,
-      contentHash: hashContent(content),
+      contentHash: hashContent(written),
+      baseContent: written,
     };
     rowsWritten += 1;
   }
@@ -229,6 +285,7 @@ async function pullDatabase(
   state: SyncState,
   writtenPaths: Set<string>,
   skipIds: Set<string>,
+  mergeMap: Map<string, Conflict>,
 ): Promise<{ rowsWritten: number }> {
   const log = opts.log ?? (() => {});
   const exp: DatabaseExport = await exportDatabase(opts.client, mapping.resolvedNotionId);
@@ -265,15 +322,16 @@ async function pullDatabase(
     );
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
     const body = await pageBlocksToMarkdown(opts.client, row.id);
-    const content = renderRowMarkdown(opts.config, row, exp, body);
-    await writeFileEnsured(filePath, content);
+    const notionContent = renderRowMarkdown(opts.config, row, exp, body);
+    const written = await writeWithMerge(filePath, notionContent, row.id, state, mergeMap, log);
     writtenPaths.add(path.normalize(filePath));
 
     state.entries[row.id] = {
       notionId: row.id,
       localPath: fileRel,
       notionLastEditedTime: row.lastEditedTime,
-      contentHash: hashContent(content),
+      contentHash: hashContent(written),
+      baseContent: written,
     };
     rowsWritten += 1;
 
@@ -289,6 +347,7 @@ async function pullDatabase(
       state,
       writtenPaths,
       skipIds,
+      mergeMap,
     );
     if (childPagesWritten > 0) {
       log(`    + ${childPagesWritten} child page(s) under ${rowSlug}/`);
@@ -331,6 +390,7 @@ async function pullRowChildPages(
   state: SyncState,
   writtenPaths: Set<string>,
   skipIds: Set<string>,
+  mergeMap: Map<string, Conflict>,
 ): Promise<number> {
   const tree = await walkPageTree(opts.client, row.id, {
     shouldDescend: (node) => !isIgnoredNotion([...node.parentPath, node.title], opts.config.notionIgnore),
@@ -358,15 +418,17 @@ async function pullRowChildPages(
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
 
     const body = await pageBlocksToMarkdown(opts.client, node.id);
-    const content = renderChildPageMarkdown(opts.config, node, row.id, body);
-    await writeFileEnsured(filePath, content);
+    const notionContent = renderChildPageMarkdown(opts.config, node, row.id, body);
+    const log = opts.log ?? (() => {});
+    const writtenContent = await writeWithMerge(filePath, notionContent, node.id, state, mergeMap, log);
     writtenPaths.add(path.normalize(filePath));
 
     state.entries[node.id] = {
       notionId: node.id,
       localPath: fileRel,
       notionLastEditedTime: node.lastEditedTime,
-      contentHash: hashContent(content),
+      contentHash: hashContent(writtenContent),
+      baseContent: writtenContent,
     };
     written += 1;
   }

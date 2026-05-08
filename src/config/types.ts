@@ -6,7 +6,16 @@ export type Direction = z.infer<typeof Direction>;
 export const CommitStrategy = z.enum(['direct', 'pr']);
 export type CommitStrategy = z.infer<typeof CommitStrategy>;
 
-export const ConflictPolicy = z.enum(['abort', 'notion-wins', 'github-wins']);
+export const ConflictPolicy = z.enum([
+  'abort',
+  'notion-wins',
+  'github-wins',
+  // Three-way merge per file using `git merge-file`: if local edits and
+  // Notion edits don't overlap, both are kept; if they do overlap, the
+  // Notion version wins. Frontmatter is regenerated from Notion on every
+  // pull, so this only affects the markdown body in practice.
+  'merge-prefer-notion',
+]);
 export type ConflictPolicy = z.infer<typeof ConflictPolicy>;
 
 export const MappingType = z.enum(['page', 'database']);
