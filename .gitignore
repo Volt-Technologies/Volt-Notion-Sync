@@ -6,3 +6,7 @@ dist/
 .DS_Store
 .tmp-pilot/
 .claude/
+
+# Real Logic App parameter values (secrets). Only the .template.json is tracked.
+infra/logic-app/parameters.json
+
