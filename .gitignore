@@ -7,6 +7,9 @@ dist/
 .tmp-pilot/
 .claude/
 
-# Real Logic App parameter values (secrets). Only the .template.json is tracked.
-infra/logic-app/parameters.json
+# Logic App workflow definition holds parameter defaultValues that may
+# contain rotated secrets when the user pastes them locally before
+# copy-paste deploying to Azure. Keep it untracked so we can't ship a
+# secret to a public repo by accident.
+azure/notion-to-github-logicapp.json
 
