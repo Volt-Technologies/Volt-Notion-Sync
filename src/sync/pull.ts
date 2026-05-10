@@ -485,7 +485,7 @@ function renderRowMarkdown(
   return `---\n${YAML.stringify(fm).trimEnd()}\n---\n\n# ${row.title}\n\n${trimmedBody}\n`;
 }
 
-async function writeFileEnsured(filePath: string, content: string): Promise<void> {
+export async function writeFileEnsured(filePath: string, content: string): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, content, 'utf-8');
 }

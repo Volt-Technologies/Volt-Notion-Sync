@@ -303,11 +303,31 @@ jobs:
       # do NOT push here — pushing on these triggers would write the just-
       # pulled markdown back to Notion, which Notion treats as another edit
       # and fires another webhook, looping forever.
-      - name: Pull from Notion
+      #
+      # Webhook (repository_dispatch) carries a notionEntityId in the
+      # client_payload — we pass that as --entity so the CLI only re-pulls
+      # the mapping containing that entity (~14× cheaper for a typical
+      # Quickstart project). Cron + manual runs do a full pull as a safety
+      # net for missed/late/aggregated webhook events.
+      - name: Pull from Notion (targeted on webhook, full on cron/manual)
         if: github.event_name != 'push'
         env:
           NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
-        run: npx --yes github:Volt-Technologies/Volt-Notion-Sync pull --repo "$GITHUB_WORKSPACE"
+          NOTION_ENTITY_ID:   \${{ github.event.client_payload.notionEntityId }}
+          NOTION_ENTITY_TYPE: \${{ github.event.client_payload.notionEntityType }}
+          NOTION_EVENT_TYPE:  \${{ github.event.client_payload.notionEventType }}
+        run: |
+          if [ "\${{ github.event_name }}" = "repository_dispatch" ] && [ -n "$NOTION_ENTITY_ID" ]; then
+            echo "targeted pull: entity=$NOTION_ENTITY_ID type=\${NOTION_ENTITY_TYPE:-page} event=\${NOTION_EVENT_TYPE:-(none)}"
+            npx --yes github:Volt-Technologies/Volt-Notion-Sync pull \\
+              --repo "$GITHUB_WORKSPACE" \\
+              --entity "$NOTION_ENTITY_ID" \\
+              \${NOTION_ENTITY_TYPE:+--entity-type "$NOTION_ENTITY_TYPE"} \\
+              \${NOTION_EVENT_TYPE:+--event "$NOTION_EVENT_TYPE"}
+          else
+            echo "full pull"
+            npx --yes github:Volt-Technologies/Volt-Notion-Sync pull --repo "$GITHUB_WORKSPACE"
+          fi
 
       - name: Commit pulled changes (direct-mode)
         if: github.event_name != 'push'

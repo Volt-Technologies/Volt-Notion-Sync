@@ -8,6 +8,7 @@ import { createNotionClient } from './notion/client.js';
 import { resolveMappings, inspectRoot } from './mapping/resolve.js';
 import { pull } from './sync/pull.js';
 import { push } from './sync/push.js';
+import { pullEntity, type EntityType } from './sync/entityPull.js';
 import { bootstrap, renderMappingsYaml } from './bootstrap/run.js';
 import type { Config, ResolvedMapping } from './config/types.js';
 
@@ -22,8 +23,36 @@ program
   .description('Pull Notion → repo')
   .option('--repo <path>', 'project repo root', process.cwd())
   .option('--token <token>', 'Notion integration token (defaults to $NOTION_TOKEN)')
+  .option(
+    '--entity <id>',
+    'Targeted pull: only sync the mapping containing this Notion entity id ' +
+      '(typically from a webhook). Skips the full per-mapping walk for unrelated mappings.',
+  )
+  .option(
+    '--entity-type <type>',
+    'Type hint for --entity (page|database|data_source|block|comment). Defaults to page.',
+  )
+  .option(
+    '--event <eventType>',
+    'Notion webhook event type (e.g. page.content_updated, page.deleted, ' +
+      'data_source.schema_updated). Drives delete handling and ignores comments/locks.',
+  )
   .action(async (opts) => {
     const { config, client, mappings, repoRoot } = await prepare(opts);
+    if (opts.entity) {
+      const result = await pullEntity({
+        client,
+        repoRoot,
+        config,
+        mappings,
+        entityId: opts.entity,
+        entityType: opts.entityType as EntityType | undefined,
+        eventType: opts.event,
+        log: (m) => console.log(m),
+      });
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
     const result = await pull({ client, repoRoot, config, mappings, log: (m) => console.log(m) });
     console.log(JSON.stringify(redactConflicts(result), null, 2));
   });
