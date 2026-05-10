@@ -313,9 +313,14 @@ jobs:
         if: github.event_name != 'push'
         env:
           NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
-          NOTION_ENTITY_ID:   \${{ github.event.client_payload.notionEntityId }}
-          NOTION_ENTITY_TYPE: \${{ github.event.client_payload.notionEntityType }}
-          NOTION_EVENT_TYPE:  \${{ github.event.client_payload.notionEventType }}
+          # Field names here match what the Azure Logic App (notion-github-sync)
+          # writes into client_payload — entity.id / entity.type come from
+          # the raw Notion webhook entity object; notion_event_type is the
+          # snake_case Notion event name (page.content_updated, page.deleted,
+          # data_source.schema_updated, ...).
+          NOTION_ENTITY_ID:   \${{ github.event.client_payload.entity.id }}
+          NOTION_ENTITY_TYPE: \${{ github.event.client_payload.entity.type }}
+          NOTION_EVENT_TYPE:  \${{ github.event.client_payload.notion_event_type }}
         run: |
           if [ "\${{ github.event_name }}" = "repository_dispatch" ] && [ -n "$NOTION_ENTITY_ID" ]; then
             echo "targeted pull: entity=$NOTION_ENTITY_ID type=\${NOTION_ENTITY_TYPE:-page} event=\${NOTION_EVENT_TYPE:-(none)}"
