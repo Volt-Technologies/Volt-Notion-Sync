@@ -356,6 +356,28 @@ jobs:
             echo "no content changes"
           fi
 
+      # ─── Propagate Notion edits to feature branches ───────────────
+      # Notion edits landed on main above. Feature branches cut before
+      # the edit came in are now stale — and agents that are already
+      # running on those branches won't see the update until merge.
+      # \`pull-branches\` iterates every \`feature/*\` branch, re-runs the
+      # pull with \`--prefer-local\` (so any FDD/TDD/Documentation/test-
+      # report edits the agent already made on the branch are kept
+      # untouched on conflict), and commits + pushes the resulting
+      # .volt/ delta on each branch. Skipped for the push trigger
+      # because that path is repo → Notion, not Notion → repo.
+      - name: Propagate Notion edits to feature branches
+        if: github.event_name != 'push'
+        env:
+          NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
+        run: |
+          git config user.name  "volt-notion-sync[bot]"
+          git config user.email "volt-notion-sync[bot]@users.noreply.github.com"
+          npx --yes github:Volt-Technologies/Volt-Notion-Sync pull-branches \\
+            --repo "$GITHUB_WORKSPACE" \\
+            --pattern 'feature/*' \\
+            --message "chore(notion-sync): propagate Notion edits [skip ci]"
+
       # ─── repo → Notion (PUSH ONLY) ────────────────────────────────
       # Only when a developer commits to .volt/**/*.md on main, and never
       # when the actor is our own bot or the commit was tagged [skip ci].

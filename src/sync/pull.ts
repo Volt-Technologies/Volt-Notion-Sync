@@ -10,6 +10,7 @@ import { isIgnoredNotion, matchesAny } from '../mapping/glob.js';
 import { hashContent, loadState, saveState, type SyncState } from './state.js';
 import { detectConflicts, applyConflictPolicy, formatConflicts, type Conflict } from './conflict.js';
 import { mergePreferNotion } from './merge.js';
+import type { ConflictPolicy } from '../config/types.js';
 
 
 export interface PullOptions {
@@ -18,6 +19,13 @@ export interface PullOptions {
   config: Config;
   mappings: ResolvedMapping[];
   log?: (msg: string) => void;
+  /**
+   * Per-invocation override of `config.conflictPolicy`. Used by the
+   * `pull-branches` flow so a single CLI run can sync `main` with the
+   * project's normal policy AND a feature branch with `github-wins`
+   * (preserve agent edits) without rewriting the config file.
+   */
+  conflictPolicyOverride?: ConflictPolicy;
 }
 
 export interface PullResult {
@@ -41,13 +49,14 @@ export async function pull(opts: PullOptions): Promise<PullResult> {
   };
 
   const state = await loadState(opts.repoRoot);
+  const effectivePolicy: ConflictPolicy = opts.conflictPolicyOverride ?? opts.config.conflictPolicy;
   const conflicts = await detectConflicts({
     client: opts.client,
     repoRoot: opts.repoRoot,
     state,
     mappings: opts.mappings,
   });
-  const { aborted } = applyConflictPolicy(opts.config.conflictPolicy, conflicts);
+  const { aborted } = applyConflictPolicy(effectivePolicy, conflicts);
   if (aborted.length > 0) {
     // Throwing already prints formatConflicts to stderr; don't double-log.
     throw new Error(
@@ -57,13 +66,13 @@ export async function pull(opts: PullOptions): Promise<PullResult> {
   result.conflicts = conflicts;
 
   const skipIds = new Set(
-    opts.config.conflictPolicy === 'github-wins' ? conflicts.map((c) => c.notionId) : [],
+    effectivePolicy === 'github-wins' ? conflicts.map((c) => c.notionId) : [],
   );
   // Index of both-changed conflicts the merge-prefer-notion path must
   // resolve in-line. Other policies leave this empty so writeWithMerge
   // is a straight passthrough.
   const mergeMap = new Map<string, Conflict>(
-    opts.config.conflictPolicy === 'merge-prefer-notion'
+    effectivePolicy === 'merge-prefer-notion'
       ? conflicts.filter((c) => c.reason === 'both-changed').map((c) => [c.notionId, c])
       : [],
   );

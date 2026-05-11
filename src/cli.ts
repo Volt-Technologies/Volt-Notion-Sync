@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { writeFile, mkdir, access, copyFile } from 'node:fs/promises';
+import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { loadConfig, ConfigError } from './config/load.js';
 import { QUICKSTART_TEMPLATE_YAML, WORKFLOW_TEMPLATE_YAML } from './config/defaults.js';
@@ -9,6 +10,7 @@ import { resolveMappings, inspectRoot } from './mapping/resolve.js';
 import { pull } from './sync/pull.js';
 import { push } from './sync/push.js';
 import { pullEntity, type EntityType } from './sync/entityPull.js';
+import { pullFeatureBranches, getCurrentBranch } from './sync/branches.js';
 import { bootstrap, renderMappingsYaml } from './bootstrap/run.js';
 import type { Config, ResolvedMapping } from './config/types.js';
 
@@ -37,6 +39,14 @@ program
     'Notion webhook event type (e.g. page.content_updated, page.deleted, ' +
       'data_source.schema_updated). Drives delete handling and ignores comments/locks.',
   )
+  .option(
+    '--prefer-local',
+    'On conflict (local file changed AND Notion changed), keep the local ' +
+      'file untouched. Equivalent to conflictPolicy=github-wins for this ' +
+      'invocation. Use when running on a feature branch so agent edits ' +
+      'are never clobbered by a stray Notion update.',
+    false,
+  )
   .action(async (opts) => {
     const { config, client, mappings, repoRoot } = await prepare(opts);
     if (opts.entity) {
@@ -53,7 +63,14 @@ program
       console.log(JSON.stringify(result, null, 2));
       return;
     }
-    const result = await pull({ client, repoRoot, config, mappings, log: (m) => console.log(m) });
+    const result = await pull({
+      client,
+      repoRoot,
+      config,
+      mappings,
+      log: (m) => console.log(m),
+      conflictPolicyOverride: opts.preferLocal ? 'github-wins' : undefined,
+    });
     console.log(JSON.stringify(redactConflicts(result), null, 2));
   });
 
@@ -63,8 +80,18 @@ program
   .option('--repo <path>', 'project repo root', process.cwd())
   .option('--token <token>', 'Notion integration token (defaults to $NOTION_TOKEN)')
   .option('--mapping <name>', 'Only push files belonging to mapping <name>')
+  .option(
+    '--allow-non-default-branch',
+    'Allow push to run from a non-default branch. Off by default because ' +
+      'pushing a feature branch back to Notion would clobber other ' +
+      'branches’ work (Notion has one canonical state per page).',
+    false,
+  )
   .action(async (opts) => {
     const { config, client, mappings, repoRoot } = await prepare(opts);
+    if (!opts.allowNonDefaultBranch) {
+      await assertDefaultBranchForPush(repoRoot);
+    }
     const filtered = opts.mapping ? filterMappingByName(mappings, opts.mapping) : mappings;
     const result = await push({
       client,
@@ -74,6 +101,36 @@ program
       log: (m) => console.log(m),
     });
     console.log(JSON.stringify(result, null, 2));
+  });
+
+program
+  .command('pull-branches')
+  .description(
+    'Propagate Notion edits to branches matching a pattern (default: ' +
+      '`feature/*`). For each branch: checkout, pull with prefer-local ' +
+      '(agent edits win on conflict), commit `.volt/` deltas, push. Run ' +
+      '`pull` on the default branch first via the normal flow.',
+  )
+  .option('--repo <path>', 'project repo root', process.cwd())
+  .option('--token <token>', 'Notion integration token (defaults to $NOTION_TOKEN)')
+  .option('--pattern <pattern>', 'Glob-style branch name pattern (passed to git for-each-ref)', 'feature/*')
+  .option('--no-fetch', 'Skip the initial `git fetch --prune`')
+  .option('--no-push', 'Run pull + commit but skip pushing back to origin (dry run)')
+  .option('--message <msg>', 'Commit message for the per-branch sync commit')
+  .action(async (opts) => {
+    const { config, client, mappings, repoRoot } = await prepare(opts);
+    const result = await pullFeatureBranches({
+      client,
+      repoRoot,
+      config,
+      mappings,
+      pattern: opts.pattern,
+      fetch: opts.fetch !== false,
+      push: opts.push !== false,
+      commitMessage: opts.message,
+      log: (m) => console.log(m),
+    });
+    console.log(JSON.stringify(redactBranchResult(result), null, 2));
   });
 
 program
@@ -277,6 +334,51 @@ function redactConflicts<T extends { conflicts: Array<{ mapping: unknown }> }>(r
     ...result,
     conflicts: result.conflicts.map(({ mapping, ...rest }) => rest),
   };
+}
+
+function redactBranchResult(result: {
+  branches: Array<{ pull: { conflicts: Array<{ mapping: unknown }> } }>;
+}): unknown {
+  return {
+    ...result,
+    branches: result.branches.map((b) => ({
+      ...b,
+      pull: redactConflicts(b.pull),
+    })),
+  };
+}
+
+// Best-effort guard: read the project's default branch from git config and
+// refuse to push if HEAD isn't that branch. Falls back to the common names
+// `main` / `master` when no symbolic ref is configured (e.g. shallow CI
+// checkouts). Throws with an actionable message so the operator can
+// decide whether to use `--allow-non-default-branch`.
+async function assertDefaultBranchForPush(repoRoot: string): Promise<void> {
+  const current = await getCurrentBranch(repoRoot).catch(() => null);
+  if (!current) {
+    die('cannot determine current git branch — run from inside the repo');
+  }
+  let defaultBranch: string | null = null;
+  try {
+    // Symbolic ref set by `git clone` / `git fetch --update-head-ok`.
+    const out = execSync('git symbolic-ref refs/remotes/origin/HEAD', {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+    }).trim();
+    // Format: refs/remotes/origin/<branch>
+    const m = /^refs\/remotes\/origin\/(.+)$/.exec(out);
+    if (m) defaultBranch = m[1] ?? null;
+  } catch {
+    // No symbolic ref — guess.
+    defaultBranch = current === 'master' ? 'master' : 'main';
+  }
+  if (defaultBranch && current !== defaultBranch) {
+    die(
+      `push refuses to run from \`${current}\` — default branch is \`${defaultBranch}\`. ` +
+        `Pushing a feature branch back to Notion would overwrite shared state. ` +
+        `If you really mean it, pass --allow-non-default-branch.`,
+    );
+  }
 }
 
 async function loadConfigOrDie(repoRoot: string) {
