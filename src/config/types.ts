@@ -74,7 +74,12 @@ export const ConfigSchema = z.object({
   }),
   defaultDirection: Direction.default('both'),
   commitStrategy: CommitStrategy.default('direct'),
-  conflictPolicy: ConflictPolicy.default('abort'),
+  // Default: on conflict (Notion AND local both changed since last
+  // sync) Notion wins. The push path also consults this — under
+  // notion-wins, files whose Notion page has been edited since our
+  // recorded last_edited_time are skipped rather than overwritten. This
+  // keeps the invariant "Notion is the source of truth for updates".
+  conflictPolicy: ConflictPolicy.default('notion-wins'),
   mappings: z.array(MappingSchema).default([]),
   // Pull in the CLI's STANDARD_MAPPINGS (Process Flows, Waterfall Tasks,
   // Project Definition, Meetings — all marked optional). Repos override

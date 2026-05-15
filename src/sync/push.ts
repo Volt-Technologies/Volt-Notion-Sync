@@ -6,7 +6,7 @@ import type { Config, ResolvedMapping } from '../config/types.js';
 import { listLocalFiles, type LocalFile } from '../markdown/walker.js';
 import { parseMarkdownFile } from '../markdown/parse.js';
 import { markdownToBlocks } from '../markdown/toBlocks.js';
-import { listChildBlocks } from '../notion/walker.js';
+import { listChildBlocks, collectNamedChildren, fetchPage } from '../notion/walker.js';
 import { hashContent, loadState, saveState, type SyncState } from './state.js';
 
 export interface PushOptions {
@@ -44,6 +44,13 @@ export async function push(opts: PushOptions): Promise<PushResult> {
   // a notion_id written back into its frontmatter) before we push the child.
   files.sort((a, b) => fileDepth(a) - fileDepth(b));
 
+  // Under notion-wins (the default), Notion is authoritative for any
+  // page that has been edited since our last recorded sync. We refuse
+  // to overwrite those. github-wins forces the push regardless. abort
+  // / merge-prefer-notion treat a remote-changed page like notion-wins
+  // on the push path (push has no way to merge mid-stream).
+  const enforceNotionWins = opts.config.conflictPolicy !== 'github-wins';
+
   for (const file of files) {
     const parsed = await parseMarkdownFile(file.absPath);
     // Skip files whose content matches what we recorded after the last sync.
@@ -54,6 +61,14 @@ export async function push(opts: PushOptions): Promise<PushResult> {
         log(`  unchanged, skip: ${file.relPath}`);
         result.skipped += 1;
         continue;
+      }
+      if (enforceNotionWins && recorded) {
+        const remoteChanged = await hasRemoteAdvanced(opts.client, parsed.notionId, recorded.notionLastEditedTime);
+        if (remoteChanged) {
+          log(`  notion-wins, skip (remote changed): ${file.relPath}`);
+          result.skipped += 1;
+          continue;
+        }
       }
     }
     const depth = fileDepth(file);
@@ -258,6 +273,15 @@ async function replacePageBlocks(
 ): Promise<void> {
   const existing = await listChildBlocks(client, pageId);
   for (const b of existing) {
+    // HARD INVARIANT: GitHub → Notion sync must NEVER delete a Notion
+    // page or database. In Notion's data model a sub-page is a
+    // `child_page` block and an embedded database is a `child_database`
+    // block — deleting either via blocks.delete archives the
+    // page/database itself. Layout containers (column_list, column,
+    // callout, toggle, synced_block) can also wrap pages/databases, and
+    // Notion cascades deletes down to children, so a container holding
+    // any page/database descendant must be preserved too.
+    if (await isPageOrDatabaseCarrier(client, b)) continue;
     try {
       await client.blocks.delete({ block_id: b.id });
     } catch {
@@ -268,6 +292,40 @@ async function replacePageBlocks(
     const batch = blocks.slice(i, i + 100);
     await client.blocks.children.append({ block_id: pageId, children: batch as never });
   }
+}
+
+// Has the Notion page advanced beyond our recorded sync point? Used
+// by the push path to enforce notion-wins: if a human (or another
+// integration) edited the page since the last sync, we refuse to push
+// over their changes. Falls back to "no" on retrieval errors so a
+// transient API failure doesn't block legitimate pushes — pull will
+// catch any divergence on the next cycle.
+async function hasRemoteAdvanced(
+  client: Client,
+  pageId: string,
+  recordedLastEditedTime: string | undefined,
+): Promise<boolean> {
+  if (!recordedLastEditedTime) return false;
+  try {
+    const page = await fetchPage(client, pageId);
+    return page.last_edited_time !== recordedLastEditedTime;
+  } catch {
+    return false;
+  }
+}
+
+// True if deleting `block` would archive a Notion page or database —
+// either directly (type is child_page/child_database) or transitively
+// (it's a container whose subtree contains one). Used as a guard before
+// any blocks.delete call on the push path.
+async function isPageOrDatabaseCarrier(
+  client: Client,
+  block: { id: string; type: string; has_children?: boolean },
+): Promise<boolean> {
+  if (block.type === 'child_page' || block.type === 'child_database') return true;
+  if (!block.has_children) return false;
+  const descendants = await collectNamedChildren(client, block.id);
+  return descendants.length > 0;
 }
 
 function titleProperty(title: string): Record<string, unknown> {

@@ -963,7 +963,7 @@ var require_command = __commonJS({
   "node_modules/commander/lib/command.js"(exports2) {
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
-    var path8 = require("node:path");
+    var path11 = require("node:path");
     var fs = require("node:fs");
     var process2 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
@@ -1896,9 +1896,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
-          const localBin = path8.resolve(baseDir, baseName);
+          const localBin = path11.resolve(baseDir, baseName);
           if (fs.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path8.extname(baseName))) return void 0;
+          if (sourceExt.includes(path11.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
             (ext2) => fs.existsSync(`${localBin}${ext2}`)
           );
@@ -1916,17 +1916,17 @@ Expecting one of '${allowedValues.join("', '")}'`);
           } catch (err) {
             resolvedScriptPath = this._scriptPath;
           }
-          executableDir = path8.resolve(
-            path8.dirname(resolvedScriptPath),
+          executableDir = path11.resolve(
+            path11.dirname(resolvedScriptPath),
             executableDir
           );
         }
         if (executableDir) {
           let localFile = findFile(executableDir, executableFile);
           if (!localFile && !subcommand._executableFile && this._scriptPath) {
-            const legacyName = path8.basename(
+            const legacyName = path11.basename(
               this._scriptPath,
-              path8.extname(this._scriptPath)
+              path11.extname(this._scriptPath)
             );
             if (legacyName !== this._name) {
               localFile = findFile(
@@ -1937,7 +1937,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
           }
           executableFile = localFile || executableFile;
         }
-        launchWithNode = sourceExt.includes(path8.extname(executableFile));
+        launchWithNode = sourceExt.includes(path11.extname(executableFile));
         let proc;
         if (process2.platform !== "win32") {
           if (launchWithNode) {
@@ -2777,7 +2777,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @return {Command}
        */
       nameFromFilename(filename) {
-        this._name = path8.basename(filename, path8.extname(filename));
+        this._name = path11.basename(filename, path11.extname(filename));
         return this;
       }
       /**
@@ -2791,9 +2791,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [path]
        * @return {(string|null|Command)}
        */
-      executableDir(path9) {
-        if (path9 === void 0) return this._executableDir;
-        this._executableDir = path9;
+      executableDir(path12) {
+        if (path12 === void 0) return this._executableDir;
+        this._executableDir = path12;
         return this;
       }
       /**
@@ -3100,17 +3100,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path8) {
-      const ctrl = callVisitor(key, node, visitor, path8);
+    function visit_(key, node, visitor, path11) {
+      const ctrl = callVisitor(key, node, visitor, path11);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path8, ctrl);
-        return visit_(key, ctrl, visitor, path8);
+        replaceNode(key, path11, ctrl);
+        return visit_(key, ctrl, visitor, path11);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path8 = Object.freeze(path8.concat(node));
+          path11 = Object.freeze(path11.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path8);
+            const ci = visit_(i, node.items[i], visitor, path11);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -3121,13 +3121,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path8 = Object.freeze(path8.concat(node));
-          const ck = visit_("key", node.key, visitor, path8);
+          path11 = Object.freeze(path11.concat(node));
+          const ck = visit_("key", node.key, visitor, path11);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path8);
+          const cv = visit_("value", node.value, visitor, path11);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -3148,17 +3148,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path8) {
-      const ctrl = await callVisitor(key, node, visitor, path8);
+    async function visitAsync_(key, node, visitor, path11) {
+      const ctrl = await callVisitor(key, node, visitor, path11);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path8, ctrl);
-        return visitAsync_(key, ctrl, visitor, path8);
+        replaceNode(key, path11, ctrl);
+        return visitAsync_(key, ctrl, visitor, path11);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path8 = Object.freeze(path8.concat(node));
+          path11 = Object.freeze(path11.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path8);
+            const ci = await visitAsync_(i, node.items[i], visitor, path11);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -3169,13 +3169,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path8 = Object.freeze(path8.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path8);
+          path11 = Object.freeze(path11.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path11);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path8);
+          const cv = await visitAsync_("value", node.value, visitor, path11);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -3202,23 +3202,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path8) {
+    function callVisitor(key, node, visitor, path11) {
       if (typeof visitor === "function")
-        return visitor(key, node, path8);
+        return visitor(key, node, path11);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path8);
+        return visitor.Map?.(key, node, path11);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path8);
+        return visitor.Seq?.(key, node, path11);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path8);
+        return visitor.Pair?.(key, node, path11);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path8);
+        return visitor.Scalar?.(key, node, path11);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path8);
+        return visitor.Alias?.(key, node, path11);
       return void 0;
     }
-    function replaceNode(key, path8, node) {
-      const parent = path8[path8.length - 1];
+    function replaceNode(key, path11, node) {
+      const parent = path11[path11.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -3826,10 +3826,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path8, value) {
+    function collectionFromPath(schema, path11, value) {
       let v = value;
-      for (let i = path8.length - 1; i >= 0; --i) {
-        const k = path8[i];
+      for (let i = path11.length - 1; i >= 0; --i) {
+        const k = path11[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -3848,7 +3848,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path8) => path8 == null || typeof path8 === "object" && !!path8[Symbol.iterator]().next().done;
+    var isEmptyPath = (path11) => path11 == null || typeof path11 === "object" && !!path11[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -3878,11 +3878,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path8, value) {
-        if (isEmptyPath(path8))
+      addIn(path11, value) {
+        if (isEmptyPath(path11))
           this.add(value);
         else {
-          const [key, ...rest] = path8;
+          const [key, ...rest] = path11;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -3896,8 +3896,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path8) {
-        const [key, ...rest] = path8;
+      deleteIn(path11) {
+        const [key, ...rest] = path11;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -3911,8 +3911,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path8, keepScalar) {
-        const [key, ...rest] = path8;
+      getIn(path11, keepScalar) {
+        const [key, ...rest] = path11;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -3930,8 +3930,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path8) {
-        const [key, ...rest] = path8;
+      hasIn(path11) {
+        const [key, ...rest] = path11;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -3941,8 +3941,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path8, value) {
-        const [key, ...rest] = path8;
+      setIn(path11, value) {
+        const [key, ...rest] = path11;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -6454,9 +6454,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path8, value) {
+      addIn(path11, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path8, value);
+          this.contents.addIn(path11, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -6531,14 +6531,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path8) {
-        if (Collection.isEmptyPath(path8)) {
+      deleteIn(path11) {
+        if (Collection.isEmptyPath(path11)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path8) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path11) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -6553,10 +6553,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path8, keepScalar) {
-        if (Collection.isEmptyPath(path8))
+      getIn(path11, keepScalar) {
+        if (Collection.isEmptyPath(path11))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path8, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path11, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -6567,10 +6567,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path8) {
-        if (Collection.isEmptyPath(path8))
+      hasIn(path11) {
+        if (Collection.isEmptyPath(path11))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path8) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path11) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -6587,13 +6587,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path8, value) {
-        if (Collection.isEmptyPath(path8)) {
+      setIn(path11, value) {
+        if (Collection.isEmptyPath(path11)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path8), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path11), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path8, value);
+          this.contents.setIn(path11, value);
         }
       }
       /**
@@ -8550,9 +8550,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path8) => {
+    visit.itemAtPath = (cst, path11) => {
       let item = cst;
-      for (const [field, index] of path8) {
+      for (const [field, index] of path11) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -8561,23 +8561,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path8) => {
-      const parent = visit.itemAtPath(cst, path8.slice(0, -1));
-      const field = path8[path8.length - 1][0];
+    visit.parentCollection = (cst, path11) => {
+      const parent = visit.itemAtPath(cst, path11.slice(0, -1));
+      const field = path11[path11.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path8, item, visitor) {
-      let ctrl = visitor(item, path8);
+    function _visit(path11, item, visitor) {
+      let ctrl = visitor(item, path11);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path8.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path11.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -8588,10 +8588,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path8);
+            ctrl = ctrl(item, path11);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path8) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path11) : ctrl;
     }
     exports2.visit = visit;
   }
@@ -10420,7 +10420,7 @@ var require_errors2 = __commonJS({
     function isNotionClientErrorWithCode(error, codes) {
       return isNotionClientError(error) && error.code in codes;
     }
-    var RequestTimeoutError = class _RequestTimeoutError extends NotionClientErrorBase {
+    var RequestTimeoutError2 = class _RequestTimeoutError extends NotionClientErrorBase {
       constructor(message = "Request to Notion API has timed out") {
         super(message);
         this.code = ClientErrorCode.RequestTimeout;
@@ -10440,7 +10440,7 @@ var require_errors2 = __commonJS({
         });
       }
     };
-    exports2.RequestTimeoutError = RequestTimeoutError;
+    exports2.RequestTimeoutError = RequestTimeoutError2;
     var HTTPResponseError = class extends NotionClientErrorBase {
       constructor(args) {
         super(args.message);
@@ -10473,7 +10473,7 @@ var require_errors2 = __commonJS({
       return true;
     }
     exports2.isHTTPResponseError = isHTTPResponseError;
-    var UnknownHTTPResponseError = class extends HTTPResponseError {
+    var UnknownHTTPResponseError2 = class extends HTTPResponseError {
       constructor(args) {
         var _a2;
         super({
@@ -10489,7 +10489,7 @@ var require_errors2 = __commonJS({
         });
       }
     };
-    exports2.UnknownHTTPResponseError = UnknownHTTPResponseError;
+    exports2.UnknownHTTPResponseError = UnknownHTTPResponseError2;
     var apiErrorCodes = {
       [APIErrorCode.Unauthorized]: true,
       [APIErrorCode.RestrictedResource]: true,
@@ -10503,7 +10503,7 @@ var require_errors2 = __commonJS({
       [APIErrorCode.InternalServerError]: true,
       [APIErrorCode.ServiceUnavailable]: true
     };
-    var APIResponseError = class extends HTTPResponseError {
+    var APIResponseError3 = class extends HTTPResponseError {
       constructor() {
         super(...arguments);
         this.name = "APIResponseError";
@@ -10512,11 +10512,11 @@ var require_errors2 = __commonJS({
         return isNotionClientErrorWithCode(error, apiErrorCodes);
       }
     };
-    exports2.APIResponseError = APIResponseError;
+    exports2.APIResponseError = APIResponseError3;
     function buildRequestError(response, bodyText) {
       const apiErrorResponseBody = parseAPIErrorResponseBody(bodyText);
       if (apiErrorResponseBody !== void 0) {
-        return new APIResponseError({
+        return new APIResponseError3({
           code: apiErrorResponseBody.code,
           message: apiErrorResponseBody.message,
           headers: response.headers,
@@ -10524,7 +10524,7 @@ var require_errors2 = __commonJS({
           rawBodyText: bodyText
         });
       }
-      return new UnknownHTTPResponseError({
+      return new UnknownHTTPResponseError2({
         message: void 0,
         headers: response.headers,
         status: response.status,
@@ -11514,14 +11514,14 @@ var require_url_state_machine = __commonJS({
       return url.replace(/\u0009|\u000A|\u000D/g, "");
     }
     function shortenPath(url) {
-      const path8 = url.path;
-      if (path8.length === 0) {
+      const path11 = url.path;
+      if (path11.length === 0) {
         return;
       }
-      if (url.scheme === "file" && path8.length === 1 && isNormalizedWindowsDriveLetter(path8[0])) {
+      if (url.scheme === "file" && path11.length === 1 && isNormalizedWindowsDriveLetter(path11[0])) {
         return;
       }
-      path8.pop();
+      path11.pop();
     }
     function includesCredentials(url) {
       return url.username !== "" || url.password !== "";
@@ -14216,10 +14216,10 @@ var require_Client = __commonJS({
        * @param body
        * @returns
        */
-      async request({ path: path8, method, query, body, auth }) {
-        this.log(logging_1.LogLevel.INFO, "request start", { method, path: path8 });
+      async request({ path: path11, method, query, body, auth }) {
+        this.log(logging_1.LogLevel.INFO, "request start", { method, path: path11 });
         const bodyAsJsonString = !body || Object.entries(body).length === 0 ? void 0 : JSON.stringify(body);
-        const url = new URL(`${__classPrivateFieldGet(this, _Client_prefixUrl, "f")}${path8}`);
+        const url = new URL(`${__classPrivateFieldGet(this, _Client_prefixUrl, "f")}${path11}`);
         if (query) {
           for (const [key, value] of Object.entries(query)) {
             if (value !== void 0) {
@@ -14259,7 +14259,7 @@ var require_Client = __commonJS({
             throw (0, errors_1.buildRequestError)(response, responseText);
           }
           const responseJson = JSON.parse(responseText);
-          this.log(logging_1.LogLevel.INFO, "request success", { method, path: path8 });
+          this.log(logging_1.LogLevel.INFO, "request success", { method, path: path11 });
           return responseJson;
         } catch (error) {
           if (!(0, errors_1.isNotionClientError)(error)) {
@@ -16011,7 +16011,7 @@ var require_loader = __commonJS({
         state.result += _result;
       }
     }
-    function mergeMappings(state, destination, source, overridableKeys) {
+    function mergeMappings2(state, destination, source, overridableKeys) {
       var sourceKeys, key, index, quantity;
       if (!common.isObject(source)) {
         throwError(state, "cannot merge mappings; the provided source object is unacceptable");
@@ -16048,10 +16048,10 @@ var require_loader = __commonJS({
       if (keyTag === "tag:yaml.org,2002:merge") {
         if (Array.isArray(valueNode)) {
           for (index = 0, quantity = valueNode.length; index < quantity; index += 1) {
-            mergeMappings(state, _result, valueNode[index], overridableKeys);
+            mergeMappings2(state, _result, valueNode[index], overridableKeys);
           }
         } else {
-          mergeMappings(state, _result, valueNode, overridableKeys);
+          mergeMappings2(state, _result, valueNode, overridableKeys);
         }
       } else {
         if (!state.json && !_hasOwnProperty.call(overridableKeys, keyNode) && _hasOwnProperty.call(_result, keyNode)) {
@@ -17943,8 +17943,9 @@ var {
 } = import_index.default;
 
 // src/cli.ts
-var import_promises8 = require("node:fs/promises");
-var import_node_path6 = __toESM(require("node:path"), 1);
+var import_promises10 = require("node:fs/promises");
+var import_node_child_process3 = require("node:child_process");
+var import_node_path9 = __toESM(require("node:path"), 1);
 
 // src/config/load.ts
 var import_promises = require("node:fs/promises");
@@ -18429,8 +18430,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path8, errorMaps, issueData } = params;
-  const fullPath = [...path8, ...issueData.path || []];
+  const { data, path: path11, errorMaps, issueData } = params;
+  const fullPath = [...path11, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -18546,11 +18547,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path8, key) {
+  constructor(parent, value, path11, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path8;
+    this._path = path11;
     this._key = key;
   }
   get path() {
@@ -21995,16 +21996,41 @@ var NEVER = INVALID;
 // src/config/types.ts
 var Direction = external_exports.enum(["pull", "push", "both"]);
 var CommitStrategy = external_exports.enum(["direct", "pr"]);
-var ConflictPolicy = external_exports.enum(["abort", "notion-wins", "github-wins"]);
+var ConflictPolicy = external_exports.enum([
+  "abort",
+  "notion-wins",
+  "github-wins",
+  // Three-way merge per file using `git merge-file`: if local edits and
+  // Notion edits don't overlap, both are kept; if they do overlap, the
+  // Notion version wins. Frontmatter is regenerated from Notion on every
+  // pull, so this only affects the markdown body in practice.
+  "merge-prefer-notion"
+]);
 var MappingType = external_exports.enum(["page", "database"]);
 var MappingSchema = external_exports.object({
   notion: external_exports.string().optional(),
   notionId: external_exports.string().optional(),
-  local: external_exports.string().min(1),
-  type: MappingType.default("page"),
+  // `local` is optional in repo overrides — a repo entry with only
+  // `notion: "Process Flows"` and `disabled: true` (or just a property
+  // override) inherits `local` from the matching standard mapping.
+  local: external_exports.string().min(1).optional(),
+  // Left optional with no default — repo overrides that omit `type`
+  // inherit from the matching standard mapping. Pure-repo extras get
+  // 'page' filled in by mergeMappings.
+  type: MappingType.optional(),
   direction: Direction.optional(),
   commitStrategy: CommitStrategy.optional(),
-  optional: external_exports.boolean().default(false)
+  optional: external_exports.boolean().default(false),
+  // Skip this standard mapping entirely. Repos use this to opt out of
+  // a single mapping while still inheriting the rest. Has no effect on
+  // mappings the repo defines from scratch.
+  disabled: external_exports.boolean().default(false),
+  // Database mappings only: name of a Notion property whose value
+  // becomes the per-row subfolder. Rows with property = "Extension"
+  // land at <local>/extension/<row-slug>.md, etc. Supports select,
+  // multi_select (first option), status, and rich_text properties.
+  // Unset or property missing → flat layout under <local>/.
+  groupByProperty: external_exports.string().optional()
 }).refine((m) => Boolean(m.notion || m.notionId), {
   message: "each mapping must specify either `notion` (name) or `notionId` (uuid)"
 });
@@ -22020,50 +22046,215 @@ var ConfigSchema = external_exports.object({
   }),
   defaultDirection: Direction.default("both"),
   commitStrategy: CommitStrategy.default("direct"),
-  conflictPolicy: ConflictPolicy.default("abort"),
-  mappings: external_exports.array(MappingSchema).min(1),
+  // Default: on conflict (Notion AND local both changed since last
+  // sync) Notion wins. The push path also consults this — under
+  // notion-wins, files whose Notion page has been edited since our
+  // recorded last_edited_time are skipped rather than overwritten. This
+  // keeps the invariant "Notion is the source of truth for updates".
+  conflictPolicy: ConflictPolicy.default("notion-wins"),
+  mappings: external_exports.array(MappingSchema).default([]),
+  // Pull in the CLI's STANDARD_MAPPINGS (Process Flows, Waterfall Tasks,
+  // Project Definition, Meetings — all marked optional). Repos override
+  // by `notion:` name in their `mappings` list, or skip individually via
+  // `disabled: true`. Set this to false if a repo wants full control.
+  useStandardMappings: external_exports.boolean().default(true),
   notionIgnore: external_exports.array(external_exports.string()).default([]),
   localIgnore: external_exports.array(external_exports.string()).default([]),
   markdown: MarkdownOptions
 });
 
-// src/config/load.ts
-var CONFIG_FILENAME = ".volt-sync.yml";
-var VOLT_DIR = ".volt";
-var ConfigError = class extends Error {
-  constructor(message, path8) {
-    super(message);
-    this.path = path8;
-    this.name = "ConfigError";
-  }
-};
-async function loadConfig(repoRoot) {
-  const configPath = import_node_path.default.join(repoRoot, VOLT_DIR, CONFIG_FILENAME);
-  let raw;
-  try {
-    raw = await (0, import_promises.readFile)(configPath, "utf-8");
-  } catch (err) {
-    throw new ConfigError(
-      `Could not read ${VOLT_DIR}/${CONFIG_FILENAME} at ${configPath}. Run \`volt-notion-sync scaffold\` to create one.`,
-      configPath
-    );
-  }
-  let parsed;
-  try {
-    parsed = import_yaml.default.parse(raw);
-  } catch (err) {
-    throw new ConfigError(`Invalid YAML in ${configPath}: ${err.message}`, configPath);
-  }
-  const result = ConfigSchema.safeParse(parsed);
-  if (!result.success) {
-    const issues = result.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
-    throw new ConfigError(`Invalid config in ${configPath}:
-${issues}`, configPath);
-  }
-  return result.data;
-}
-
 // src/config/defaults.ts
+var STANDARD_MAPPINGS = [
+  // ── Page trees ────────────────────────────────────────────────────
+  {
+    notion: "Process Flows",
+    local: "docs/process-flows",
+    type: "page",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Waterfall Tasks",
+    local: "projectmanagement/waterfall-tasks",
+    type: "page",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Project Definition",
+    local: "docs/project-definition",
+    type: "page",
+    optional: true,
+    disabled: false
+  },
+  // ── Databases (canonical, under Settings → Databases) ─────────────
+  // Waterfall Tasks rows are grouped into Type-named subfolders
+  // (extension/, migration/, integration/, reports/, training/) by the
+  // canonical "Type" select property. The Volt platform reads each
+  // type's rows directly from its subfolder — no per-file Type filter
+  // needed. Stage artifacts (FDD, TDD, documentation, test-report) live
+  // in a sibling <slug>/ folder inside the same group.
+  {
+    notion: "Meetings",
+    local: "projectmanagement/meetings",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Waterfall Tasks",
+    local: "projectmanagement/waterfall-tasks",
+    type: "database",
+    optional: true,
+    disabled: false,
+    groupByProperty: "Type"
+  },
+  {
+    notion: "Issues",
+    local: "projectmanagement/issues",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Sprints",
+    local: "projectmanagement/sprints",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Milestones",
+    local: "projectmanagement/milestones",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Phases",
+    local: "projectmanagement/phases",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Project Members",
+    local: "projectmanagement/project-members",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Process Flows",
+    local: "projectmanagement/process-flows",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Abstract Process Flows",
+    local: "projectmanagement/abstract-process-flows",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Notes",
+    local: "projectmanagement/notes",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Sprint Goals",
+    local: "projectmanagement/sprint-goals",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Transcripts",
+    local: "projectmanagement/transcripts",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Project Notes",
+    local: "projectmanagement/project-notes",
+    type: "database",
+    optional: true,
+    disabled: false
+  },
+  {
+    notion: "Subtasks",
+    local: "projectmanagement/subtasks",
+    type: "database",
+    optional: true,
+    disabled: false
+  }
+];
+var STANDARD_NOTION_IGNORE = ["Settings", "Task Execution Log"];
+var STANDARD_LOCAL_IGNORE = [
+  "**/*.al",
+  "**/*.json",
+  "**/*.csv",
+  "**/.gitkeep",
+  ".sync-state.json"
+];
+function mergeMappings(repo, useStandard) {
+  if (!useStandard) {
+    return repo.map(fillTypeDefault);
+  }
+  const out = [];
+  const overridesByStdKey = /* @__PURE__ */ new Map();
+  const repoExtras = [];
+  for (const m of repo) {
+    const std = m.notion ? STANDARD_MAPPINGS.find(
+      (s) => s.notion === m.notion && (m.type === void 0 || s.type === m.type)
+    ) : void 0;
+    if (std) {
+      overridesByStdKey.set(stdKey(std), m);
+    } else {
+      if (!m.local) {
+        throw new Error(
+          `Repo-defined mapping "${m.notion ?? m.notionId}" must specify \`local:\` (it doesn't match any standard mapping to inherit from).`
+        );
+      }
+      repoExtras.push(fillTypeDefault(m));
+    }
+  }
+  for (const std of STANDARD_MAPPINGS) {
+    const override = overridesByStdKey.get(stdKey(std));
+    if (!override) {
+      out.push(std);
+      continue;
+    }
+    if (override.disabled) continue;
+    out.push({
+      ...std,
+      ...stripUndefined(override),
+      // Inherit `local` and `type` from standard when override omits them
+      local: override.local ?? std.local,
+      type: override.type ?? std.type
+    });
+  }
+  out.push(...repoExtras);
+  return out;
+}
+function stdKey(m) {
+  return `${m.notion}|${m.type ?? "page"}`;
+}
+function fillTypeDefault(m) {
+  return m.type === void 0 ? { ...m, type: "page" } : m;
+}
+function stripUndefined(o) {
+  const r = {};
+  for (const [k, v] of Object.entries(o)) {
+    if (v !== void 0) r[k] = v;
+  }
+  return r;
+}
 var WORKFLOW_TEMPLATE_YAML = `name: Volt Notion Sync
 
 # Triggers, in order of how this workflow gets woken up:
@@ -22106,31 +22297,96 @@ jobs:
         with:
           node-version: '20'
 
+      # The CLI lives in Volt-Technologies/Volt-Notion-Sync. We pull it
+      # via npx on every run so each project repo automatically picks up
+      # engine updates without needing the bundle copied in. Pin to a tag
+      # (e.g. github:Volt-Technologies/Volt-Notion-Sync#v0.2.0) if you
+      # want a project to stop tracking main.
+      - name: Cache npx download
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm/_npx
+          key: npx-volt-notion-sync-\${{ runner.os }}
+
       # \u2500\u2500\u2500 Notion \u2192 repo (PULL ONLY) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
       # Triggered by webhook dispatch, cron, or manual run. We deliberately
       # do NOT push here \u2014 pushing on these triggers would write the just-
       # pulled markdown back to Notion, which Notion treats as another edit
       # and fires another webhook, looping forever.
-      - name: Pull from Notion
+      #
+      # Webhook (repository_dispatch) carries a notionEntityId in the
+      # client_payload \u2014 we pass that as --entity so the CLI only re-pulls
+      # the mapping containing that entity (~14\xD7 cheaper for a typical
+      # Quickstart project). Cron + manual runs do a full pull as a safety
+      # net for missed/late/aggregated webhook events.
+      - name: Pull from Notion (targeted on webhook, full on cron/manual)
         if: github.event_name != 'push'
         env:
           NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
-        run: node .volt/.cli/volt-notion-sync.cjs pull --repo "$GITHUB_WORKSPACE"
+          # Field names here match what the Azure Logic App (notion-github-sync)
+          # writes into client_payload \u2014 entity.id / entity.type come from
+          # the raw Notion webhook entity object; notion_event_type is the
+          # snake_case Notion event name (page.content_updated, page.deleted,
+          # data_source.schema_updated, ...).
+          NOTION_ENTITY_ID:   \${{ github.event.client_payload.entity.id }}
+          NOTION_ENTITY_TYPE: \${{ github.event.client_payload.entity.type }}
+          NOTION_EVENT_TYPE:  \${{ github.event.client_payload.notion_event_type }}
+        run: |
+          if [ "\${{ github.event_name }}" = "repository_dispatch" ] && [ -n "$NOTION_ENTITY_ID" ]; then
+            echo "targeted pull: entity=$NOTION_ENTITY_ID type=\${NOTION_ENTITY_TYPE:-page} event=\${NOTION_EVENT_TYPE:-(none)}"
+            npx --yes github:Volt-Technologies/Volt-Notion-Sync pull \\
+              --repo "$GITHUB_WORKSPACE" \\
+              --entity "$NOTION_ENTITY_ID" \\
+              \${NOTION_ENTITY_TYPE:+--entity-type "$NOTION_ENTITY_TYPE"} \\
+              \${NOTION_EVENT_TYPE:+--event "$NOTION_EVENT_TYPE"}
+          else
+            echo "full pull"
+            npx --yes github:Volt-Technologies/Volt-Notion-Sync pull --repo "$GITHUB_WORKSPACE"
+          fi
 
       - name: Commit pulled changes (direct-mode)
         if: github.event_name != 'push'
         run: |
           git config user.name  "volt-notion-sync[bot]"
           git config user.email "volt-notion-sync[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain)" ]; then
-            git add -A
+          # Stage everything, then unstage the sync-state file. That file
+          # holds lastPullAt, which the engine rewrites on every pull \u2014
+          # including pulls where no Notion content changed. Without this
+          # filter, every cron tick would create a noisy timestamp-only
+          # commit. We still write it locally for the next run on the
+          # same runner; we just don't push it.
+          git add -A
+          git reset HEAD '.volt/.sync-state.json' >/dev/null 2>&1 || true
+          if ! git diff --cached --quiet; then
             # [skip ci] keeps the resulting commit from re-triggering this
             # same workflow on the push trigger below.
             git commit -m "chore(notion-sync): pull $(date -u +%FT%TZ) [skip ci]"
             git push
           else
-            echo "no changes"
+            echo "no content changes"
           fi
+
+      # \u2500\u2500\u2500 Propagate Notion edits to feature branches \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+      # Notion edits landed on main above. Feature branches cut before
+      # the edit came in are now stale \u2014 and agents that are already
+      # running on those branches won't see the update until merge.
+      # \`pull-branches\` iterates every \`feature/*\` branch, re-runs the
+      # pull with \`--prefer-local\` (so any FDD/TDD/Documentation/test-
+      # report edits the agent already made on the branch are kept
+      # untouched on conflict), and commits + pushes the resulting
+      # .volt/ delta on each branch. Skipped for the push trigger
+      # because that path is repo \u2192 Notion, not Notion \u2192 repo.
+      - name: Propagate Notion edits to feature branches
+        if: github.event_name != 'push'
+        env:
+          NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
+        run: |
+          git config user.name  "volt-notion-sync[bot]"
+          git config user.email "volt-notion-sync[bot]@users.noreply.github.com"
+          npx --yes github:Volt-Technologies/Volt-Notion-Sync pull-branches \\
+            --repo "$GITHUB_WORKSPACE" \\
+            --pattern 'feature/*' \\
+            --message "chore(notion-sync): propagate Notion edits [skip ci]"
 
       # \u2500\u2500\u2500 repo \u2192 Notion (PUSH ONLY) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
       # Only when a developer commits to .volt/**/*.md on main, and never
@@ -22157,15 +22413,16 @@ jobs:
         if: github.event_name == 'push' && github.actor != 'volt-notion-sync[bot]' && !contains(github.event.head_commit.message, '[skip ci]') && steps.pushable_changes.outputs.skip != 'true'
         env:
           NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
-        run: node .volt/.cli/volt-notion-sync.cjs push --repo "$GITHUB_WORKSPACE"
+        run: npx --yes github:Volt-Technologies/Volt-Notion-Sync push --repo "$GITHUB_WORKSPACE"
 
       - name: Commit notion_id write-back from new pages
         if: github.event_name == 'push' && github.actor != 'volt-notion-sync[bot]' && !contains(github.event.head_commit.message, '[skip ci]') && steps.pushable_changes.outputs.skip != 'true'
         run: |
           git config user.name  "volt-notion-sync[bot]"
           git config user.email "volt-notion-sync[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain)" ]; then
-            git add -A
+          git add -A
+          git reset HEAD '.volt/.sync-state.json' >/dev/null 2>&1 || true
+          if ! git diff --cached --quiet; then
             git commit -m "chore(notion-sync): write back notion_id $(date -u +%FT%TZ) [skip ci]"
             git push
           fi
@@ -22178,20 +22435,21 @@ jobs:
           NOTION_TOKEN: \${{ secrets.NOTION_TOKEN }}
           GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         run: |
-          ROUTES=$(node .volt/.cli/volt-notion-sync.cjs routes --no-resolve --repo "$GITHUB_WORKSPACE")
+          ROUTES=$(npx --yes github:Volt-Technologies/Volt-Notion-Sync routes --no-resolve --repo "$GITHUB_WORKSPACE")
           PR_COUNT=$(echo "$ROUTES" | jq '.pr | length')
           if [ "$PR_COUNT" = "0" ]; then
             echo "no pr-mode mappings"
             exit 0
           fi
-          node .volt/.cli/volt-notion-sync.cjs pull --repo "$GITHUB_WORKSPACE" || true
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "no pr-mode changes"
+          npx --yes github:Volt-Technologies/Volt-Notion-Sync pull --repo "$GITHUB_WORKSPACE" || true
+          git add -A
+          git reset HEAD '.volt/.sync-state.json' >/dev/null 2>&1 || true
+          if git diff --cached --quiet; then
+            echo "no pr-mode content changes"
             exit 0
           fi
           BRANCH="notion-sync/pr-$(date -u +%Y%m%d-%H%M%S)"
           git checkout -b "$BRANCH"
-          git add -A
           git commit -m "chore(notion-sync): pr-mode pull $(date -u +%FT%TZ) [skip ci]"
           git push -u origin "$BRANCH"
           gh pr create \\
@@ -22201,64 +22459,135 @@ jobs:
             --body "Automated PR for review-required Notion mappings (commitStrategy: pr)."
 `;
 var QUICKSTART_TEMPLATE_YAML = `version: 1
+
 notion:
   teamspaceId: REPLACE_WITH_TEAMSPACE_UUID
-  rootPageId: REPLACE_WITH_PROJECT_HOME_PAGE_UUID
+  rootPageId:  REPLACE_WITH_PROJECT_HOME_PAGE_UUID
 
-defaultDirection: both
-commitStrategy: direct
-conflictPolicy: abort
+# Notion is the source of truth for updates. If the same page changed
+# in both Notion and the repo since the last sync, Notion wins
+# wholesale \u2014 the local file is overwritten on pull, and push refuses
+# to overwrite a Notion page whose last_edited_time has advanced past
+# our recorded sync point. Push will NEVER delete a page in Notion
+# (child_page / child_database / their layout-container parents are
+# preserved across every push).
+conflictPolicy: notion-wins
 
-mappings:
-  - notion: "Process Flows"
-    local: docs/process-flows
-  - notion: "Waterfall Tasks"
-    local: projectmanagement/waterfall-tasks
-  - notion: "Project Definition"
-    local: docs/project-definition
-  - notion: "Features"
-    local: docs/features
-    optional: true
-  - notion: "Resources"
-    local: docs/resources
-  - notion: "Miscellaneous"
-    local: docs/misc
+# Standard mappings (Process Flows, Waterfall Tasks, Project Definition,
+# Meetings) come from the CLI \u2014 see STANDARD_MAPPINGS in
+# Volt-Notion-Sync/src/config/defaults.ts. To override one, list it here
+# with the same \`notion:\` name and any fields you want to change. To
+# skip one entirely, list it with \`disabled: true\`. Set
+# \`useStandardMappings: false\` at the top level for full opt-out.
+mappings: []
 
-  - notion: "Meetings"
-    local: projectmanagement/meetings
-    type: database
-  - notion: "PM Tasks"
-    local: projectmanagement/pm-tasks
-    type: database
-    commitStrategy: pr
-    direction: pull
-
-notionIgnore:
-  - "Settings"
-  - "Task Execution Log"
-
-localIgnore:
-  - implementation/**
-  - powerbi/**
-  - tools/**
-  - "**/*.al"
-  - "**/*.json"
-  - "**/*.csv"
-  - "**/.gitkeep"
-  - .sync-state.json
-
-markdown:
-  frontmatter: true
-  attachments: .attachments
+# Repo-specific notionIgnore/localIgnore are CONCATENATED with the
+# CLI's STANDARD_NOTION_IGNORE / STANDARD_LOCAL_IGNORE \u2014 no need to
+# repeat the standard entries.
+notionIgnore: []
+localIgnore: []
 `;
+
+// src/config/load.ts
+var CONFIG_FILENAME = ".volt-sync.yml";
+var VOLT_DIR = ".volt";
+var ConfigError = class extends Error {
+  constructor(message, path11) {
+    super(message);
+    this.path = path11;
+    this.name = "ConfigError";
+  }
+};
+async function loadConfig(repoRoot) {
+  const configPath = import_node_path.default.join(repoRoot, VOLT_DIR, CONFIG_FILENAME);
+  let raw;
+  try {
+    raw = await (0, import_promises.readFile)(configPath, "utf-8");
+  } catch (err) {
+    throw new ConfigError(
+      `Could not read ${VOLT_DIR}/${CONFIG_FILENAME} at ${configPath}. Run \`volt-notion-sync scaffold\` to create one.`,
+      configPath
+    );
+  }
+  let parsed;
+  try {
+    parsed = import_yaml.default.parse(raw);
+  } catch (err) {
+    throw new ConfigError(`Invalid YAML in ${configPath}: ${err.message}`, configPath);
+  }
+  const result = ConfigSchema.safeParse(parsed);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
+    throw new ConfigError(`Invalid config in ${configPath}:
+${issues}`, configPath);
+  }
+  const cfg = result.data;
+  const mappings = mergeMappings(cfg.mappings, cfg.useStandardMappings);
+  if (mappings.length === 0) {
+    throw new ConfigError(
+      `No mappings defined in ${configPath} and useStandardMappings is false. Add at least one mapping or enable standard mappings.`,
+      configPath
+    );
+  }
+  const notionIgnore = cfg.useStandardMappings ? [...STANDARD_NOTION_IGNORE, ...cfg.notionIgnore] : cfg.notionIgnore;
+  const localIgnore = cfg.useStandardMappings ? [...STANDARD_LOCAL_IGNORE, ...cfg.localIgnore] : cfg.localIgnore;
+  return { ...cfg, mappings, notionIgnore, localIgnore };
+}
 
 // src/notion/client.ts
 var import_client = __toESM(require_src(), 1);
 function createNotionClient(opts) {
-  return new import_client.Client({
+  const client = new import_client.Client({
     auth: opts.token,
-    notionVersion: opts.notionVersion ?? "2025-09-03"
+    notionVersion: opts.notionVersion ?? "2025-09-03",
+    timeoutMs: 12e4
   });
+  const origRequest = client.request.bind(client);
+  client.request = (args) => withRetry(() => origRequest(args));
+  return client;
+}
+var TRANSIENT_HTTP_STATUSES = /* @__PURE__ */ new Set([429, 500, 502, 503, 504]);
+var MAX_ATTEMPTS = 6;
+var BASE_DELAY_MS = 1e3;
+var MAX_DELAY_MS = 6e4;
+var RATE_LIMIT_BASE_DELAY_MS = 3e4;
+async function withRetry(fn) {
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (!isTransient(err) || attempt === MAX_ATTEMPTS) throw err;
+      lastErr = err;
+      const isRateLimited = err instanceof import_client.APIResponseError && err.code === "rate_limited";
+      const baseDelay = isRateLimited ? RATE_LIMIT_BASE_DELAY_MS : BASE_DELAY_MS;
+      const delay = Math.min(MAX_DELAY_MS, baseDelay * 2 ** (attempt - 1));
+      const jitter = Math.floor(Math.random() * 1e3);
+      const code = err.code ?? err.name;
+      console.error(
+        `[notion-retry] attempt ${attempt}/${MAX_ATTEMPTS} failed (${code}); retrying in ${delay + jitter}ms`
+      );
+      await sleep(delay + jitter);
+    }
+  }
+  throw lastErr;
+}
+function isTransient(err) {
+  if (err instanceof import_client.RequestTimeoutError) return true;
+  if (err instanceof import_client.APIResponseError) {
+    if (TRANSIENT_HTTP_STATUSES.has(err.status)) return true;
+    if (err.code === "rate_limited") return true;
+  }
+  if (err instanceof import_client.UnknownHTTPResponseError) {
+    if (TRANSIENT_HTTP_STATUSES.has(err.status)) return true;
+  }
+  return false;
+}
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function normalizeId(id) {
+  return id.replace(/-/g, "").toLowerCase();
 }
 
 // src/notion/walker.ts
@@ -22289,20 +22618,40 @@ async function listChildBlocks(client, blockId) {
   } while (cursor);
   return out;
 }
-async function listChildPageIds(client, pageId) {
-  const blocks = await listChildBlocks(client, pageId);
-  const ids = [];
-  for (const b of blocks) {
-    if (b.type === "child_page" && !b.archived && !b.in_trash) {
-      ids.push(b.id);
+var RECURSE_INTO_TYPES = /* @__PURE__ */ new Set([
+  "column_list",
+  "column",
+  "callout",
+  "toggle",
+  "synced_block"
+]);
+async function collectNamedChildren(client, parentBlockId, maxDepth = 8) {
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  async function visit(blockId, depth) {
+    if (depth > maxDepth || seen.has(blockId)) return;
+    seen.add(blockId);
+    const blocks = await listChildBlocks(client, blockId);
+    for (const b of blocks) {
+      if (b.archived || b.in_trash) continue;
+      if (b.type === "child_page" && b.child_page?.title) {
+        out.push({ id: b.id, title: b.child_page.title, kind: "page" });
+      } else if (b.type === "child_database" && b.child_database?.title) {
+        out.push({ id: b.id, title: b.child_database.title, kind: "database" });
+      } else if (RECURSE_INTO_TYPES.has(b.type) && b.has_children) {
+        await visit(b.id, depth + 1);
+      }
     }
   }
-  return ids;
+  await visit(parentBlockId, 0);
+  return out;
 }
 async function fetchPageNode(client, pageId, parentPath) {
   const page = await fetchPage(client, pageId);
   const title = extractPageTitle(page.properties);
-  const childPageIds = await listChildPageIds(client, pageId);
+  const named = await collectNamedChildren(client, pageId);
+  const childPageIds = named.filter((c) => c.kind === "page").map((c) => c.id);
+  const childDatabaseIds = named.filter((c) => c.kind === "database").map((c) => c.id);
   return {
     id: page.id,
     title,
@@ -22311,6 +22660,7 @@ async function fetchPageNode(client, pageId, parentPath) {
     url: page.url ?? "",
     archived: Boolean(page.archived || page.in_trash),
     childPageIds,
+    childDatabaseIds,
     rawProperties: page.properties ?? {},
     icon: page.icon
   };
@@ -22344,7 +22694,13 @@ var MappingResolutionError = class extends Error {
 };
 async function resolveMappings(client, config) {
   const needsRootLookup = config.mappings.some((m) => !m.notionId && m.notion);
-  const rootChildren = needsRootLookup ? await listNamedChildren(client, config.notion.rootPageId) : [];
+  const rootChildren = needsRootLookup ? await collectNamedChildren(client, config.notion.rootPageId) : [];
+  let canonicalDbsByName;
+  const ensureCanonicalDbs = async () => {
+    if (canonicalDbsByName) return canonicalDbsByName;
+    canonicalDbsByName = await scanCanonicalDatabases(client, config.notion.rootPageId);
+    return canonicalDbsByName;
+  };
   const resolved = [];
   for (const m of config.mappings) {
     const direction = m.direction ?? config.defaultDirection;
@@ -22357,9 +22713,12 @@ async function resolveMappings(client, config) {
       );
       if (match2) {
         id = match2.id;
-      } else if (m.optional) {
-        continue;
-      } else {
+      } else if (wantedKind === "database") {
+        const dbs = await ensureCanonicalDbs();
+        id = dbs.get(m.notion.trim().toLowerCase());
+      }
+      if (!id) {
+        if (m.optional) continue;
         throw new MappingResolutionError(
           m,
           `Could not find ${m.type} named "${m.notion}" under root page ${config.notion.rootPageId}. Mark mapping as optional, fix the name, or set notionId directly.`
@@ -22369,8 +22728,12 @@ async function resolveMappings(client, config) {
     if (!id) {
       throw new MappingResolutionError(m, "Mapping resolved to no id");
     }
+    if (!m.local) {
+      throw new MappingResolutionError(m, "Mapping has no local path after merge");
+    }
     resolved.push({
       ...m,
+      local: m.local,
       resolvedNotionId: id,
       resolvedDirection: direction,
       resolvedCommitStrategy: commitStrategy
@@ -22378,35 +22741,41 @@ async function resolveMappings(client, config) {
   }
   return resolved;
 }
-async function listNamedChildren(client, parentId) {
-  const blocks = await listChildBlocks(client, parentId);
-  const out = [];
-  for (const b of blocks) {
-    if (b.type === "child_page" && b.child_page?.title) {
-      out.push({ id: b.id, title: b.child_page.title, kind: "page" });
-    } else if (b.type === "child_database" && b.child_database?.title) {
-      out.push({ id: b.id, title: b.child_database.title, kind: "database" });
+async function scanCanonicalDatabases(client, rootPageId) {
+  const out = /* @__PURE__ */ new Map();
+  const seen = /* @__PURE__ */ new Set();
+  const nodes = await walkPageTree(client, rootPageId);
+  const c = client;
+  for (const node of nodes) {
+    for (const dbId of node.childDatabaseIds) {
+      if (seen.has(dbId)) continue;
+      seen.add(dbId);
+      try {
+        const db = await c.request({
+          path: `databases/${dbId}`,
+          method: "get"
+        });
+        const hasDataSource = (db.data_sources?.length ?? 0) > 0;
+        const title = db.title?.[0]?.plain_text?.trim();
+        if (hasDataSource && title) {
+          const key = title.toLowerCase();
+          if (!out.has(key)) out.set(key, dbId);
+        }
+      } catch {
+      }
     }
   }
   return out;
 }
 async function inspectRoot(client, rootPageId) {
   const root = await fetchPageNode(client, rootPageId, []);
-  const blocks = await listChildBlocks(client, rootPageId);
-  const children = [];
-  for (const b of blocks) {
-    if (b.type === "child_page" && b.child_page?.title) {
-      children.push({ id: b.id, title: b.child_page.title, kind: "page" });
-    } else if (b.type === "child_database" && b.child_database?.title) {
-      children.push({ id: b.id, title: b.child_database.title, kind: "database" });
-    }
-  }
+  const children = await collectNamedChildren(client, rootPageId);
   return { rootTitle: root.title, children };
 }
 
 // src/sync/pull.ts
-var import_promises4 = require("node:fs/promises");
-var import_node_path3 = __toESM(require("node:path"), 1);
+var import_promises5 = require("node:fs/promises");
+var import_node_path4 = __toESM(require("node:path"), 1);
 var import_yaml2 = __toESM(require_dist(), 1);
 
 // src/notion/blocksToMarkdown.ts
@@ -22590,10 +22959,34 @@ function slugify(name, opts = {}) {
 
 // src/notion/database.ts
 async function exportDatabase(client, databaseId) {
-  const db = await client.databases.retrieve({ database_id: databaseId });
-  const dataSourceId = db.data_sources?.[0]?.id;
+  const c = client;
+  const db = await c.request({
+    path: `databases/${databaseId}`,
+    method: "get"
+  });
+  let dataSourceId = db.data_sources?.[0]?.id;
   if (!dataSourceId) {
-    throw new Error(`Database ${databaseId} has no data sources (Notion API 2025-09-03+ required)`);
+    const title = db.title?.[0]?.plain_text;
+    if (!title) {
+      throw new Error(
+        `Database ${databaseId} has empty data_sources and no title to search by. Set notionId in .volt-sync.yml to the canonical database (not its inline view).`
+      );
+    }
+    const candidates = await findCanonicalCandidates(client, title);
+    if (candidates.length === 0) {
+      throw new Error(
+        `Database ${databaseId} ("${title}") looks like an inline reference (data_sources: []) and no canonical "${title}" data source was found via search. Either share the canonical database with this integration in Notion, or set notionId directly to the canonical database UUID in .volt-sync.yml.`
+      );
+    }
+    if (candidates.length > 1) {
+      const list2 = candidates.map((c2) => `    - data source ${c2.dataSourceId}  (parent database ${c2.parentDbId})`).join("\n");
+      throw new Error(
+        `Database ${databaseId} ("${title}") is an inline reference and multiple canonical "${title}" data sources exist:
+${list2}
+Set notionId in .volt-sync.yml to the parent database UUID of the one you want.`
+      );
+    }
+    dataSourceId = candidates[0].dataSourceId;
   }
   const ds = await fetchDataSource(client, dataSourceId);
   const rows = await queryAllRows(client, dataSourceId);
@@ -22607,6 +23000,16 @@ async function exportDatabase(client, databaseId) {
 async function fetchDataSource(client, dataSourceId) {
   const c = client;
   return await c.request({ path: `data_sources/${dataSourceId}`, method: "get" });
+}
+async function findCanonicalCandidates(client, title) {
+  const c = client;
+  const res = await c.search({
+    query: title,
+    filter: { property: "object", value: "data_source" }
+  });
+  return res.results.filter(
+    (r) => r.object === "data_source" && (r.title?.[0]?.plain_text ?? "").trim() === title.trim() && r.parent?.database_id
+  ).map((r) => ({ dataSourceId: r.id, parentDbId: r.parent.database_id }));
 }
 async function queryAllRows(client, dataSourceId) {
   const out = [];
@@ -24563,6 +24966,40 @@ function formatConflicts(conflicts) {
   return conflicts.map((c) => `  ${c.reason} :: ${c.localPath} (${c.notionId})`).join("\n");
 }
 
+// src/sync/merge.ts
+var import_promises4 = require("node:fs/promises");
+var import_node_path3 = __toESM(require("node:path"), 1);
+var import_node_os = __toESM(require("node:os"), 1);
+var import_node_child_process = require("node:child_process");
+async function mergePreferNotion(notionContent, localContent, baseContent) {
+  const tmp = await (0, import_promises4.mkdtemp)(import_node_path3.default.join(import_node_os.default.tmpdir(), "volt-merge-"));
+  try {
+    const localPath = import_node_path3.default.join(tmp, "local");
+    const basePath = import_node_path3.default.join(tmp, "base");
+    const notionPath = import_node_path3.default.join(tmp, "notion");
+    await (0, import_promises4.writeFile)(localPath, localContent, "utf-8");
+    await (0, import_promises4.writeFile)(basePath, baseContent, "utf-8");
+    await (0, import_promises4.writeFile)(notionPath, notionContent, "utf-8");
+    const code = await runGitMergeFile(localPath, basePath, notionPath);
+    if (code === 0) {
+      const merged = await (0, import_promises4.readFile)(localPath, "utf-8");
+      return { content: merged, clean: true };
+    }
+    return { content: notionContent, clean: false };
+  } finally {
+    await (0, import_promises4.rm)(tmp, { recursive: true, force: true });
+  }
+}
+function runGitMergeFile(local, base, notion) {
+  return new Promise((resolve, reject) => {
+    const proc = (0, import_node_child_process.spawn)("git", ["merge-file", "--quiet", local, base, notion], {
+      stdio: "ignore"
+    });
+    proc.on("error", (err) => reject(err));
+    proc.on("exit", (code) => resolve(code ?? -1));
+  });
+}
+
 // src/sync/pull.ts
 async function pull(opts) {
   const log = opts.log ?? (() => {
@@ -24576,23 +25013,26 @@ async function pull(opts) {
     conflicts: []
   };
   const state = await loadState(opts.repoRoot);
+  const effectivePolicy = opts.conflictPolicyOverride ?? opts.config.conflictPolicy;
   const conflicts = await detectConflicts({
     client: opts.client,
     repoRoot: opts.repoRoot,
     state,
     mappings: opts.mappings
   });
-  const { aborted } = applyConflictPolicy(opts.config.conflictPolicy, conflicts);
+  const { aborted } = applyConflictPolicy(effectivePolicy, conflicts);
   if (aborted.length > 0) {
-    log(`conflict: ${aborted.length} entries \u2014 policy=abort`);
-    log(formatConflicts(aborted));
-    result.conflicts = aborted;
-    throw new Error(`Aborting pull due to ${aborted.length} conflict(s):
-${formatConflicts(aborted)}`);
+    throw new Error(
+      `Aborting pull due to ${aborted.length} conflict(s):
+${formatConflicts(aborted)}`
+    );
   }
   result.conflicts = conflicts;
   const skipIds = new Set(
-    opts.config.conflictPolicy === "github-wins" ? conflicts.map((c) => c.notionId) : []
+    effectivePolicy === "github-wins" ? conflicts.map((c) => c.notionId) : []
+  );
+  const mergeMap = new Map(
+    effectivePolicy === "merge-prefer-notion" ? conflicts.filter((c) => c.reason === "both-changed").map((c) => [c.notionId, c]) : []
   );
   const writtenPaths = /* @__PURE__ */ new Set();
   for (const mapping of opts.mappings) {
@@ -24603,21 +25043,51 @@ ${formatConflicts(aborted)}`);
     }
     if (mapping.type === "database") {
       log(`pull database: ${mapping.notion ?? mapping.notionId} \u2192 ${mapping.local}`);
-      const dbResult = await pullDatabase(opts, mapping, state, writtenPaths, skipIds);
+      const dbResult = await pullDatabase(opts, mapping, state, writtenPaths, skipIds, mergeMap);
       result.databasesWritten += 1;
       result.rowsWritten += dbResult.rowsWritten;
     } else {
       log(`pull page tree: ${mapping.notion ?? mapping.notionId} \u2192 ${mapping.local}`);
-      const pageResult = await pullPageTree(opts, mapping, state, writtenPaths, skipIds);
+      const pageResult = await pullPageTree(opts, mapping, state, writtenPaths, skipIds, mergeMap);
       result.pagesWritten += pageResult.pagesWritten;
     }
   }
-  result.filesDeleted = await pruneStale(opts.repoRoot, opts.mappings, writtenPaths, log);
+  result.filesDeleted = await pruneStale(
+    opts.repoRoot,
+    opts.mappings,
+    writtenPaths,
+    opts.config.localIgnore,
+    log
+  );
   state.lastPullAt = (/* @__PURE__ */ new Date()).toISOString();
   await saveState(opts.repoRoot, state);
   return result;
 }
-async function pullPageTree(opts, mapping, state, writtenPaths, skipIds) {
+async function writeWithMerge(filePath, notionContent, notionId, state, mergeMap, log) {
+  const conflict = mergeMap.get(notionId);
+  if (!conflict) {
+    await writeFileEnsured(filePath, notionContent);
+    return notionContent;
+  }
+  const baseContent = state.entries[notionId]?.baseContent;
+  if (baseContent === void 0) {
+    log(`  conflict (no base): ${conflict.localPath} \u2192 notion-wins`);
+    await writeFileEnsured(filePath, notionContent);
+    return notionContent;
+  }
+  let localContent;
+  try {
+    localContent = await (0, import_promises5.readFile)(filePath, "utf-8");
+  } catch {
+    await writeFileEnsured(filePath, notionContent);
+    return notionContent;
+  }
+  const result = await mergePreferNotion(notionContent, localContent, baseContent);
+  log(`  conflict: ${conflict.localPath} \u2192 ${result.clean ? "merged cleanly" : "overlap, notion-wins"}`);
+  await writeFileEnsured(filePath, result.content);
+  return result.content;
+}
+async function pullPageTree(opts, mapping, state, writtenPaths, skipIds, mergeMap) {
   const log = opts.log ?? (() => {
   });
   let pagesWritten = 0;
@@ -24630,29 +25100,88 @@ async function pullPageTree(opts, mapping, state, writtenPaths, skipIds) {
     if (skipIds.has(node.id)) continue;
     const isRootOfMapping = node.id === mapping.resolvedNotionId;
     const relSegments = isRootOfMapping ? ["index"] : [...node.parentPath.slice(1).map((s) => slugify(s)), slugify(node.title), "index"];
-    const fileRel = import_node_path3.default.posix.join(mapping.local, ...relSegments) + ".md";
-    const filePath = import_node_path3.default.join(opts.repoRoot, ".volt", fileRel);
+    const fileRel = import_node_path4.default.posix.join(mapping.local, ...relSegments) + ".md";
+    const filePath = import_node_path4.default.join(opts.repoRoot, ".volt", fileRel);
     const md = await pageBlocksToMarkdown(opts.client, node.id);
-    const content = renderMarkdownFile(opts.config, node, md);
-    await writeFileEnsured(filePath, content);
-    writtenPaths.add(import_node_path3.default.normalize(filePath));
+    const notionContent = renderMarkdownFile(opts.config, node, md);
+    const written = await writeWithMerge(filePath, notionContent, node.id, state, mergeMap, log);
+    writtenPaths.add(import_node_path4.default.normalize(filePath));
     state.entries[node.id] = {
       notionId: node.id,
       localPath: fileRel,
       notionLastEditedTime: node.lastEditedTime,
-      contentHash: hashContent(content)
+      contentHash: hashContent(written),
+      baseContent: written
     };
     pagesWritten += 1;
     log(`  page: ${fileRel}`);
+    if (node.childDatabaseIds.length > 0) {
+      const pageFolder = import_node_path4.default.posix.dirname(fileRel);
+      const flat = node.childDatabaseIds.length === 1;
+      for (const dbId of node.childDatabaseIds) {
+        await pullEmbeddedDatabase(opts, dbId, pageFolder, flat, state, writtenPaths, skipIds, mergeMap);
+      }
+    }
   }
   return { pagesWritten };
 }
-async function pullDatabase(opts, mapping, state, writtenPaths, skipIds) {
+async function pullEmbeddedDatabase(opts, databaseBlockId, pageFolder, flat, state, writtenPaths, skipIds, mergeMap) {
+  const log = opts.log ?? (() => {
+  });
+  let exp;
+  try {
+    exp = await exportDatabase(opts.client, databaseBlockId);
+  } catch (err) {
+    log(`    embedded db ${databaseBlockId}: skipped (${err.message})`);
+    return;
+  }
+  const titleProp = exp.rows[0]?.title;
+  const dbSlug = flat ? "" : slugify(titleProp || "database");
+  const baseFolder = flat ? pageFolder : import_node_path4.default.posix.join(pageFolder, dbSlug);
+  const indexPath = import_node_path4.default.posix.join(baseFolder, "_index.json");
+  const indexFull = import_node_path4.default.join(opts.repoRoot, ".volt", indexPath);
+  const indexContent = JSON.stringify(
+    {
+      databaseId: exp.databaseId,
+      dataSourceId: exp.dataSourceId,
+      schema: exp.schema,
+      rowCount: exp.rows.length,
+      embedded: true
+    },
+    null,
+    2
+  );
+  await writeFileEnsured(indexFull, indexContent);
+  writtenPaths.add(import_node_path4.default.normalize(indexFull));
+  let rowsWritten = 0;
+  for (const row of exp.rows) {
+    if (isIgnoredNotion([row.title], opts.config.notionIgnore)) continue;
+    if (skipIds.has(row.id)) continue;
+    const rowSlug = slugify(row.title || row.id);
+    const fileRel = import_node_path4.default.posix.join(baseFolder, rowSlug + ".md");
+    const filePath = import_node_path4.default.join(opts.repoRoot, ".volt", fileRel);
+    const body = await pageBlocksToMarkdown(opts.client, row.id);
+    const notionContent = renderRowMarkdown(opts.config, row, exp, body);
+    const written = await writeWithMerge(filePath, notionContent, row.id, state, mergeMap, opts.log ?? (() => {
+    }));
+    writtenPaths.add(import_node_path4.default.normalize(filePath));
+    state.entries[row.id] = {
+      notionId: row.id,
+      localPath: fileRel,
+      notionLastEditedTime: row.lastEditedTime,
+      contentHash: hashContent(written),
+      baseContent: written
+    };
+    rowsWritten += 1;
+  }
+  log(`    embedded db \u2192 ${baseFolder}: ${rowsWritten} row(s)`);
+}
+async function pullDatabase(opts, mapping, state, writtenPaths, skipIds, mergeMap) {
   const log = opts.log ?? (() => {
   });
   const exp = await exportDatabase(opts.client, mapping.resolvedNotionId);
-  const indexPath = import_node_path3.default.posix.join(mapping.local, "_index.json");
-  const indexFull = import_node_path3.default.join(opts.repoRoot, ".volt", indexPath);
+  const indexPath = import_node_path4.default.posix.join(mapping.local, "_index.json");
+  const indexFull = import_node_path4.default.join(opts.repoRoot, ".volt", indexPath);
   const indexContent = JSON.stringify(
     {
       databaseId: exp.databaseId,
@@ -24664,23 +25193,29 @@ async function pullDatabase(opts, mapping, state, writtenPaths, skipIds) {
     2
   );
   await writeFileEnsured(indexFull, indexContent);
-  writtenPaths.add(import_node_path3.default.normalize(indexFull));
+  writtenPaths.add(import_node_path4.default.normalize(indexFull));
   let rowsWritten = 0;
   for (const row of exp.rows) {
     if (isIgnoredNotion([row.title], opts.config.notionIgnore)) continue;
     if (skipIds.has(row.id)) continue;
     const rowSlug = slugify(row.title || row.id);
-    const fileRel = import_node_path3.default.posix.join(mapping.local, rowSlug + ".md");
-    const filePath = import_node_path3.default.join(opts.repoRoot, ".volt", fileRel);
+    const groupSlug = rowGroupSlug(row, mapping.groupByProperty);
+    const fileRel = import_node_path4.default.posix.join(
+      mapping.local,
+      ...groupSlug ? [groupSlug] : [],
+      rowSlug + ".md"
+    );
+    const filePath = import_node_path4.default.join(opts.repoRoot, ".volt", fileRel);
     const body = await pageBlocksToMarkdown(opts.client, row.id);
-    const content = renderRowMarkdown(opts.config, row, exp, body);
-    await writeFileEnsured(filePath, content);
-    writtenPaths.add(import_node_path3.default.normalize(filePath));
+    const notionContent = renderRowMarkdown(opts.config, row, exp, body);
+    const written = await writeWithMerge(filePath, notionContent, row.id, state, mergeMap, log);
+    writtenPaths.add(import_node_path4.default.normalize(filePath));
     state.entries[row.id] = {
       notionId: row.id,
       localPath: fileRel,
       notionLastEditedTime: row.lastEditedTime,
-      contentHash: hashContent(content)
+      contentHash: hashContent(written),
+      baseContent: written
     };
     rowsWritten += 1;
     const childPagesWritten = await pullRowChildPages(
@@ -24688,9 +25223,11 @@ async function pullDatabase(opts, mapping, state, writtenPaths, skipIds) {
       mapping,
       row,
       rowSlug,
+      groupSlug,
       state,
       writtenPaths,
-      skipIds
+      skipIds,
+      mergeMap
     );
     if (childPagesWritten > 0) {
       log(`    + ${childPagesWritten} child page(s) under ${rowSlug}/`);
@@ -24699,7 +25236,19 @@ async function pullDatabase(opts, mapping, state, writtenPaths, skipIds) {
   log(`  database rows: ${rowsWritten}`);
   return { rowsWritten };
 }
-async function pullRowChildPages(opts, mapping, row, rowSlug, state, writtenPaths, skipIds) {
+function rowGroupSlug(row, propName) {
+  if (!propName) return void 0;
+  const p = row.rawProperties[propName];
+  if (!p) return void 0;
+  let raw;
+  if (p.type === "select") raw = p.select?.name;
+  else if (p.type === "multi_select") raw = p.multi_select?.[0]?.name;
+  else if (p.type === "status") raw = p.status?.name;
+  else if (p.type === "rich_text") raw = p.rich_text?.[0]?.plain_text;
+  if (!raw || !raw.trim()) return void 0;
+  return slugify(raw);
+}
+async function pullRowChildPages(opts, mapping, row, rowSlug, groupSlug, state, writtenPaths, skipIds, mergeMap) {
   const tree = await walkPageTree(opts.client, row.id, {
     shouldDescend: (node) => !isIgnoredNotion([...node.parentPath, node.title], opts.config.notionIgnore)
   });
@@ -24709,22 +25258,26 @@ async function pullRowChildPages(opts, mapping, row, rowSlug, state, writtenPath
     if (isIgnoredNotion([...node.parentPath, node.title], opts.config.notionIgnore)) continue;
     if (skipIds.has(node.id)) continue;
     const intermediate = node.parentPath.slice(1).map((s) => slugify(s, { preserveCase: true }));
-    const fileRel = import_node_path3.default.posix.join(
+    const fileRel = import_node_path4.default.posix.join(
       mapping.local,
+      ...groupSlug ? [groupSlug] : [],
       rowSlug,
       ...intermediate,
       slugify(node.title, { preserveCase: true }) + ".md"
     );
-    const filePath = import_node_path3.default.join(opts.repoRoot, ".volt", fileRel);
+    const filePath = import_node_path4.default.join(opts.repoRoot, ".volt", fileRel);
     const body = await pageBlocksToMarkdown(opts.client, node.id);
-    const content = renderChildPageMarkdown(opts.config, node, row.id, body);
-    await writeFileEnsured(filePath, content);
-    writtenPaths.add(import_node_path3.default.normalize(filePath));
+    const notionContent = renderChildPageMarkdown(opts.config, node, row.id, body);
+    const log = opts.log ?? (() => {
+    });
+    const writtenContent = await writeWithMerge(filePath, notionContent, node.id, state, mergeMap, log);
+    writtenPaths.add(import_node_path4.default.normalize(filePath));
     state.entries[node.id] = {
       notionId: node.id,
       localPath: fileRel,
       notionLastEditedTime: node.lastEditedTime,
-      contentHash: hashContent(content)
+      contentHash: hashContent(writtenContent),
+      baseContent: writtenContent
     };
     written += 1;
   }
@@ -24794,24 +25347,27 @@ ${trimmedBody}
 `;
 }
 async function writeFileEnsured(filePath, content) {
-  await (0, import_promises4.mkdir)(import_node_path3.default.dirname(filePath), { recursive: true });
-  await (0, import_promises4.writeFile)(filePath, content, "utf-8");
+  await (0, import_promises5.mkdir)(import_node_path4.default.dirname(filePath), { recursive: true });
+  await (0, import_promises5.writeFile)(filePath, content, "utf-8");
 }
-async function pruneStale(repoRoot, mappings, writtenPaths, log) {
+async function pruneStale(repoRoot, mappings, writtenPaths, localIgnore, log) {
+  const voltRoot = import_node_path4.default.join(repoRoot, ".volt");
   let deleted = 0;
   for (const mapping of mappings) {
     if (mapping.resolvedDirection === "push") continue;
-    const root = import_node_path3.default.join(repoRoot, ".volt", mapping.local);
+    const root = import_node_path4.default.join(repoRoot, ".volt", mapping.local);
     try {
       const files = await listFilesRecursive(root);
       for (const f of files) {
-        const norm = import_node_path3.default.normalize(f);
+        const norm = import_node_path4.default.normalize(f);
         if (writtenPaths.has(norm)) continue;
-        const base = import_node_path3.default.basename(f);
+        const base = import_node_path4.default.basename(f);
         if (base === ".gitkeep" || base === "_index.json") continue;
         if (!f.endsWith(".md")) continue;
-        await (0, import_promises4.rm)(f, { force: true });
-        log(`  pruned: ${import_node_path3.default.relative(repoRoot, f)}`);
+        const relFromVolt = import_node_path4.default.relative(voltRoot, f).split(import_node_path4.default.sep).join("/");
+        if (matchesAny(relFromVolt, localIgnore)) continue;
+        await (0, import_promises5.rm)(f, { force: true });
+        log(`  pruned: ${import_node_path4.default.relative(repoRoot, f)}`);
         deleted += 1;
       }
     } catch {
@@ -24821,10 +25377,10 @@ async function pruneStale(repoRoot, mappings, writtenPaths, log) {
 }
 async function listFilesRecursive(dir) {
   const out = [];
-  const entries = await (0, import_promises4.readdir)(dir);
+  const entries = await (0, import_promises5.readdir)(dir);
   for (const name of entries) {
-    const full = import_node_path3.default.join(dir, name);
-    const s = await (0, import_promises4.stat)(full);
+    const full = import_node_path4.default.join(dir, name);
+    const s = await (0, import_promises5.stat)(full);
     if (s.isDirectory()) {
       out.push(...await listFilesRecursive(full));
     } else {
@@ -24835,20 +25391,20 @@ async function listFilesRecursive(dir) {
 }
 
 // src/sync/push.ts
-var import_promises7 = require("node:fs/promises");
-var import_node_path5 = __toESM(require("node:path"), 1);
+var import_promises8 = require("node:fs/promises");
+var import_node_path6 = __toESM(require("node:path"), 1);
 var import_yaml3 = __toESM(require_dist(), 1);
 
 // src/markdown/walker.ts
-var import_promises5 = require("node:fs/promises");
-var import_node_path4 = __toESM(require("node:path"), 1);
+var import_promises6 = require("node:fs/promises");
+var import_node_path5 = __toESM(require("node:path"), 1);
 async function listLocalFiles(repoRoot, mappings, ignorePatterns) {
   const out = [];
   for (const mapping of mappings) {
-    const root = import_node_path4.default.join(repoRoot, ".volt", mapping.local);
+    const root = import_node_path5.default.join(repoRoot, ".volt", mapping.local);
     const files = await listFilesRecursiveSafe(root);
     for (const abs of files) {
-      const rel = import_node_path4.default.relative(import_node_path4.default.join(repoRoot, ".volt"), abs).split(import_node_path4.default.sep).join("/");
+      const rel = import_node_path5.default.relative(import_node_path5.default.join(repoRoot, ".volt"), abs).split(import_node_path5.default.sep).join("/");
       if (!abs.endsWith(".md")) continue;
       if (matchesAny(rel, ignorePatterns)) continue;
       out.push({ absPath: abs, relPath: rel, mapping });
@@ -24858,11 +25414,11 @@ async function listLocalFiles(repoRoot, mappings, ignorePatterns) {
 }
 async function listFilesRecursiveSafe(dir) {
   try {
-    const entries = await (0, import_promises5.readdir)(dir);
+    const entries = await (0, import_promises6.readdir)(dir);
     const out = [];
     for (const name of entries) {
-      const full = import_node_path4.default.join(dir, name);
-      const s = await (0, import_promises5.stat)(full);
+      const full = import_node_path5.default.join(dir, name);
+      const s = await (0, import_promises6.stat)(full);
       if (s.isDirectory()) out.push(...await listFilesRecursiveSafe(full));
       else out.push(full);
     }
@@ -24873,10 +25429,10 @@ async function listFilesRecursiveSafe(dir) {
 }
 
 // src/markdown/parse.ts
-var import_promises6 = require("node:fs/promises");
+var import_promises7 = require("node:fs/promises");
 var import_gray_matter = __toESM(require_gray_matter(), 1);
 async function parseMarkdownFile(filePath) {
-  const raw = await (0, import_promises6.readFile)(filePath, "utf-8");
+  const raw = await (0, import_promises7.readFile)(filePath, "utf-8");
   return parseMarkdown(raw);
 }
 function parseMarkdown(raw) {
@@ -27389,15 +27945,24 @@ async function push(opts) {
   const pushable = opts.mappings.filter((m) => m.resolvedDirection !== "pull");
   const files = await listLocalFiles(opts.repoRoot, pushable, opts.config.localIgnore);
   files.sort((a, b) => fileDepth(a) - fileDepth(b));
+  const enforceNotionWins = opts.config.conflictPolicy !== "github-wins";
   for (const file of files) {
     const parsed = await parseMarkdownFile(file.absPath);
     if (parsed.notionId) {
       const recorded = state.entries[parsed.notionId];
-      const currentHash = hashContent(await (0, import_promises7.readFile)(file.absPath, "utf-8"));
+      const currentHash = hashContent(await (0, import_promises8.readFile)(file.absPath, "utf-8"));
       if (recorded && recorded.contentHash === currentHash) {
         log(`  unchanged, skip: ${file.relPath}`);
         result.skipped += 1;
         continue;
+      }
+      if (enforceNotionWins && recorded) {
+        const remoteChanged = await hasRemoteAdvanced(opts.client, parsed.notionId, recorded.notionLastEditedTime);
+        if (remoteChanged) {
+          log(`  notion-wins, skip (remote changed): ${file.relPath}`);
+          result.skipped += 1;
+          continue;
+        }
       }
     }
     const depth = fileDepth(file);
@@ -27422,7 +27987,7 @@ function fileDepth(file) {
 }
 async function pushPage(opts, file, parsed, state, result, log) {
   const blocks = markdownToBlocks(parsed.body);
-  const title = parsed.title || import_node_path5.default.basename(file.absPath, ".md");
+  const title = parsed.title || import_node_path6.default.basename(file.absPath, ".md");
   if (parsed.notionId) {
     await replacePageBlocks(opts.client, parsed.notionId, blocks);
     await opts.client.pages.update({
@@ -27431,11 +27996,13 @@ async function pushPage(opts, file, parsed, state, result, log) {
     });
     result.pagesUpdated += 1;
     log(`  page updated: ${file.relPath}`);
+    const onDisk = await (0, import_promises8.readFile)(file.absPath, "utf-8");
     state.entries[parsed.notionId] = {
       notionId: parsed.notionId,
       localPath: file.relPath,
       notionLastEditedTime: (/* @__PURE__ */ new Date()).toISOString(),
-      contentHash: hashContent(await (0, import_promises7.readFile)(file.absPath, "utf-8"))
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk
     };
   } else {
     const created = await opts.client.pages.create({
@@ -27447,11 +28014,13 @@ async function pushPage(opts, file, parsed, state, result, log) {
     await writeBackId(file.absPath, newId, created.url ?? "");
     result.pagesCreated += 1;
     log(`  page created: ${file.relPath} \u2192 ${newId}`);
+    const onDisk = await (0, import_promises8.readFile)(file.absPath, "utf-8");
     state.entries[newId] = {
       notionId: newId,
       localPath: file.relPath,
       notionLastEditedTime: (/* @__PURE__ */ new Date()).toISOString(),
-      contentHash: hashContent(await (0, import_promises7.readFile)(file.absPath, "utf-8"))
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk
     };
   }
 }
@@ -27471,11 +28040,13 @@ async function pushDatabaseRow(opts, file, parsed, state, result, log) {
     }
     result.rowsUpdated += 1;
     log(`  row updated: ${file.relPath} (${blocks.length} blocks)`);
+    const onDisk = await (0, import_promises8.readFile)(file.absPath, "utf-8");
     state.entries[parsed.notionId] = {
       notionId: parsed.notionId,
       localPath: file.relPath,
       notionLastEditedTime: (/* @__PURE__ */ new Date()).toISOString(),
-      contentHash: hashContent(await (0, import_promises7.readFile)(file.absPath, "utf-8"))
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk
     };
   } else {
     const c = opts.client;
@@ -27487,16 +28058,18 @@ async function pushDatabaseRow(opts, file, parsed, state, result, log) {
     await writeBackId(file.absPath, created.id, created.url ?? "");
     result.rowsCreated += 1;
     log(`  row created: ${file.relPath} \u2192 ${created.id} (${blocks.length} blocks)`);
+    const onDisk = await (0, import_promises8.readFile)(file.absPath, "utf-8");
     state.entries[created.id] = {
       notionId: created.id,
       localPath: file.relPath,
       notionLastEditedTime: (/* @__PURE__ */ new Date()).toISOString(),
-      contentHash: hashContent(await (0, import_promises7.readFile)(file.absPath, "utf-8"))
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk
     };
   }
 }
 async function pushRowChildPage(opts, file, parsed, state, result, log) {
-  const parentFile = import_node_path5.default.join(import_node_path5.default.dirname(file.absPath) + ".md");
+  const parentFile = import_node_path6.default.join(import_node_path6.default.dirname(file.absPath) + ".md");
   let parentId = null;
   try {
     const parentParsed = await parseMarkdownFile(parentFile);
@@ -27504,12 +28077,12 @@ async function pushRowChildPage(opts, file, parsed, state, result, log) {
   } catch {
   }
   if (!parentId) {
-    log(`  skip ${file.relPath}: parent ${import_node_path5.default.relative(opts.repoRoot, parentFile)} has no notion_id`);
+    log(`  skip ${file.relPath}: parent ${import_node_path6.default.relative(opts.repoRoot, parentFile)} has no notion_id`);
     result.skipped += 1;
     return;
   }
   const blocks = markdownToBlocks(parsed.body);
-  const title = parsed.title || import_node_path5.default.basename(file.absPath, ".md");
+  const title = parsed.title || import_node_path6.default.basename(file.absPath, ".md");
   if (parsed.notionId) {
     await replacePageBlocks(opts.client, parsed.notionId, blocks);
     await opts.client.pages.update({
@@ -27518,11 +28091,13 @@ async function pushRowChildPage(opts, file, parsed, state, result, log) {
     });
     result.pagesUpdated += 1;
     log(`  child updated: ${file.relPath} (${blocks.length} blocks)`);
+    const onDisk = await (0, import_promises8.readFile)(file.absPath, "utf-8");
     state.entries[parsed.notionId] = {
       notionId: parsed.notionId,
       localPath: file.relPath,
       notionLastEditedTime: (/* @__PURE__ */ new Date()).toISOString(),
-      contentHash: hashContent(await (0, import_promises7.readFile)(file.absPath, "utf-8"))
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk
     };
   } else {
     const created = await opts.client.pages.create({
@@ -27534,17 +28109,20 @@ async function pushRowChildPage(opts, file, parsed, state, result, log) {
     await writeBackId(file.absPath, newId, created.url ?? "");
     result.pagesCreated += 1;
     log(`  child created: ${file.relPath} \u2192 ${newId} (${blocks.length} blocks)`);
+    const onDisk = await (0, import_promises8.readFile)(file.absPath, "utf-8");
     state.entries[newId] = {
       notionId: newId,
       localPath: file.relPath,
       notionLastEditedTime: (/* @__PURE__ */ new Date()).toISOString(),
-      contentHash: hashContent(await (0, import_promises7.readFile)(file.absPath, "utf-8"))
+      contentHash: hashContent(onDisk),
+      baseContent: onDisk
     };
   }
 }
 async function replacePageBlocks(client, pageId, blocks) {
   const existing = await listChildBlocks(client, pageId);
   for (const b of existing) {
+    if (await isPageOrDatabaseCarrier(client, b)) continue;
     try {
       await client.blocks.delete({ block_id: b.id });
     } catch {
@@ -27554,6 +28132,21 @@ async function replacePageBlocks(client, pageId, blocks) {
     const batch = blocks.slice(i, i + 100);
     await client.blocks.children.append({ block_id: pageId, children: batch });
   }
+}
+async function hasRemoteAdvanced(client, pageId, recordedLastEditedTime) {
+  if (!recordedLastEditedTime) return false;
+  try {
+    const page = await fetchPage(client, pageId);
+    return page.last_edited_time !== recordedLastEditedTime;
+  } catch {
+    return false;
+  }
+}
+async function isPageOrDatabaseCarrier(client, block2) {
+  if (block2.type === "child_page" || block2.type === "child_database") return true;
+  if (!block2.has_children) return false;
+  const descendants = await collectNamedChildren(client, block2.id);
+  return descendants.length > 0;
 }
 function titleProperty(title) {
   return { title: { title: [{ type: "text", text: { content: title } }] } };
@@ -27620,7 +28213,7 @@ function toIsoDate(value) {
   return s;
 }
 async function writeBackId(filePath, notionId, notionUrl) {
-  const raw = await (0, import_promises7.readFile)(filePath, "utf-8");
+  const raw = await (0, import_promises8.readFile)(filePath, "utf-8");
   const fmEnd = raw.indexOf("\n---", 4);
   if (!raw.startsWith("---\n") || fmEnd === -1) {
     const fm = `---
@@ -27628,7 +28221,7 @@ ${import_yaml3.default.stringify({ notion_id: notionId, notion_url: notionUrl })
 ---
 
 `;
-    await (0, import_promises7.writeFile)(filePath, fm + raw, "utf-8");
+    await (0, import_promises8.writeFile)(filePath, fm + raw, "utf-8");
     return;
   }
   const fmText = raw.slice(4, fmEnd);
@@ -27639,7 +28232,256 @@ ${import_yaml3.default.stringify({ notion_id: notionId, notion_url: notionUrl })
 ${import_yaml3.default.stringify(data).trimEnd()}
 ---`;
   const rest = raw.slice(fmEnd + 4);
-  await (0, import_promises7.writeFile)(filePath, newFm + rest, "utf-8");
+  await (0, import_promises8.writeFile)(filePath, newFm + rest, "utf-8");
+}
+
+// src/sync/entityPull.ts
+var import_node_path7 = __toESM(require("node:path"), 1);
+var import_promises9 = require("node:fs/promises");
+var import_client2 = __toESM(require_src(), 1);
+var IGNORE_EVENTS = /* @__PURE__ */ new Set([
+  "page.locked",
+  "page.unlocked",
+  "comment.created",
+  "comment.updated",
+  "comment.deleted",
+  "database.created",
+  "database.moved",
+  "database.deleted",
+  "database.undeleted",
+  "data_source.moved"
+]);
+function shouldIgnoreEvent(eventType) {
+  if (!eventType) return false;
+  return IGNORE_EVENTS.has(eventType);
+}
+function isDeleteEvent(eventType) {
+  return eventType === "page.deleted" || eventType === "data_source.deleted";
+}
+async function pullEntity(opts) {
+  const log = opts.log ?? (() => {
+  });
+  if (shouldIgnoreEvent(opts.eventType)) {
+    log(`event "${opts.eventType}" \u2192 ignored (no markdown impact)`);
+    return { action: "ignored", notionId: opts.entityId };
+  }
+  if (isDeleteEvent(opts.eventType)) {
+    return await deleteLocal(opts, log);
+  }
+  const owning = await walkParentsToMapping(
+    opts.client,
+    opts.entityId,
+    opts.entityType ?? "page",
+    opts.mappings
+  );
+  if (!owning) {
+    log(`entity ${opts.entityId} doesn't belong to any configured mapping \u2192 no-op`);
+    return { action: "no-mapping-match", notionId: opts.entityId };
+  }
+  const mappingName = owning.mapping.notion ?? owning.mapping.notionId ?? owning.mapping.local;
+  log(`entity ${opts.entityId} \u2192 mapping "${mappingName}"`);
+  const stateBefore = await loadState(opts.repoRoot);
+  const lastPullAtBefore = stateBefore.lastPullAt;
+  const result = await pull({
+    client: opts.client,
+    repoRoot: opts.repoRoot,
+    config: opts.config,
+    mappings: [owning.mapping],
+    log
+  });
+  const stateAfter = await loadState(opts.repoRoot);
+  if (stateAfter.lastPullAt !== lastPullAtBefore) {
+    stateAfter.lastPullAt = lastPullAtBefore;
+    await saveState(opts.repoRoot, stateAfter);
+  }
+  return {
+    action: "mapping-pull",
+    notionId: opts.entityId,
+    mappingLocal: owning.mapping.local,
+    pull: result
+  };
+}
+async function deleteLocal(opts, log) {
+  const state = await loadState(opts.repoRoot);
+  const entry = state.entries[opts.entityId];
+  if (!entry) {
+    log(`delete event for unknown entity ${opts.entityId} \u2192 no-op`);
+    return { action: "ignored", notionId: opts.entityId };
+  }
+  const full = import_node_path7.default.join(opts.repoRoot, ".volt", entry.localPath);
+  try {
+    await (0, import_promises9.rm)(full, { force: true });
+    log(`deleted ${entry.localPath}`);
+  } catch (err) {
+    log(`delete of ${entry.localPath} failed: ${err.message}`);
+  }
+  delete state.entries[opts.entityId];
+  await saveState(opts.repoRoot, state);
+  return { action: "deleted", notionId: opts.entityId, localPath: entry.localPath };
+}
+async function walkParentsToMapping(client, entityId, entityType, mappings) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const m of mappings) {
+    byId.set(normalizeId(m.resolvedNotionId), m);
+  }
+  let currentId = normalizeId(entityId);
+  let currentType = entityType;
+  for (let step = 0; step < 16; step += 1) {
+    const hit = byId.get(currentId);
+    if (hit) return { mapping: hit };
+    const parent = await fetchParent(client, currentId, currentType);
+    if (!parent) return null;
+    currentId = normalizeId(parent.id);
+    currentType = parent.type;
+  }
+  return null;
+}
+async function fetchParent(client, id, type) {
+  const c = client;
+  try {
+    if (type === "page" || type === "block") {
+      const page = await client.pages.retrieve({ page_id: id });
+      return parentToRef(page.parent);
+    }
+    if (type === "database") {
+      const db = await c.request({ path: `databases/${id}`, method: "get" });
+      return parentToRef(db.parent);
+    }
+    if (type === "data_source") {
+      const ds = await c.request({ path: `data_sources/${id}`, method: "get" });
+      return parentToRef(ds.parent);
+    }
+    return null;
+  } catch (err) {
+    if (err instanceof import_client2.APIResponseError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+function parentToRef(parent) {
+  if (!parent) return null;
+  if (parent.type === "page_id" && parent.page_id) {
+    return { id: parent.page_id, type: "page" };
+  }
+  if (parent.type === "database_id" && parent.database_id) {
+    return { id: parent.database_id, type: "database" };
+  }
+  if (parent.type === "data_source_id" && parent.data_source_id) {
+    return { id: parent.data_source_id, type: "data_source" };
+  }
+  if (parent.type === "block_id" && parent.block_id) {
+    return null;
+  }
+  return null;
+}
+
+// src/sync/branches.ts
+var import_node_child_process2 = require("node:child_process");
+var import_node_path8 = __toESM(require("node:path"), 1);
+async function pullFeatureBranches(opts) {
+  const log = opts.log ?? (() => {
+  });
+  const pattern = opts.pattern ?? "feature/*";
+  const doFetch = opts.fetch ?? true;
+  const doPush = opts.push ?? true;
+  const commitMessage = opts.commitMessage ?? "chore(notion-sync): propagate Notion edits";
+  await git(opts.repoRoot, ["checkout", "--", ".volt/.sync-state.json"]).catch(() => void 0);
+  await assertCleanWorkingTree(opts.repoRoot);
+  const startedFromBranch = await currentBranch(opts.repoRoot);
+  if (doFetch) {
+    log("git fetch --prune");
+    await git(opts.repoRoot, ["fetch", "--prune"]);
+  }
+  const branches = await discoverBranches(opts.repoRoot, pattern);
+  log(`discovered ${branches.length} branch(es) matching ${pattern}`);
+  const outcomes = [];
+  const skipped = [];
+  try {
+    for (const branch of branches) {
+      try {
+        log(`
+\u2192 ${branch}`);
+        await git(opts.repoRoot, ["checkout", "-B", branch, `origin/${branch}`]);
+        const pullResult = await pull({
+          client: opts.client,
+          repoRoot: opts.repoRoot,
+          config: opts.config,
+          mappings: opts.mappings,
+          conflictPolicyOverride: "github-wins",
+          log: (m) => log(`  [pull] ${m}`)
+        });
+        await git(opts.repoRoot, ["add", "--", ".volt"]);
+        await git(opts.repoRoot, ["reset", "HEAD", "--", ".volt/.sync-state.json"]).catch(() => void 0);
+        const staged = await git(opts.repoRoot, ["diff", "--cached", "--name-only"]);
+        const changed = staged.trim().length > 0;
+        let pushed = false;
+        if (changed) {
+          await git(opts.repoRoot, ["commit", "-m", commitMessage]);
+          if (doPush) {
+            await git(opts.repoRoot, ["push", "origin", branch]);
+            pushed = true;
+          }
+          log(`  committed${pushed ? " (pushed)" : ""}: ${staged.trim().split("\n").length} file(s)`);
+        } else {
+          log("  no .volt/ content changes");
+          await git(opts.repoRoot, ["checkout", "--", ".volt/.sync-state.json"]).catch(() => void 0);
+        }
+        outcomes.push({ branch, changed, pushed, pull: pullResult });
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        log(`  ! skipped: ${reason}`);
+        skipped.push({ branch, reason });
+        await git(opts.repoRoot, ["reset", "--hard", "HEAD"]).catch(() => void 0);
+      }
+    }
+  } finally {
+    await git(opts.repoRoot, ["checkout", startedFromBranch]).catch(() => void 0);
+  }
+  return { startedFromBranch, branches: outcomes, skipped };
+}
+async function git(repoRoot, args) {
+  return new Promise((resolve, reject) => {
+    const child = (0, import_node_child_process2.spawn)("git", args, { cwd: repoRoot, env: process.env });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (b) => {
+      stdout += b.toString();
+    });
+    child.stderr.on("data", (b) => {
+      stderr += b.toString();
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) resolve(stdout.trim());
+      else reject(new Error(`git ${args.join(" ")} exited ${code}: ${stderr.trim() || stdout.trim()}`));
+    });
+  });
+}
+async function currentBranch(repoRoot) {
+  return git(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]);
+}
+async function assertCleanWorkingTree(repoRoot) {
+  const out = await git(repoRoot, ["status", "--porcelain"]);
+  if (out.length > 0) {
+    throw new Error(
+      "working tree is not clean \u2014 commit or stash before running pull-branches:\n" + out
+    );
+  }
+}
+async function discoverBranches(repoRoot, pattern) {
+  const remoteRef = `refs/remotes/origin/${pattern}`;
+  const out = await git(repoRoot, [
+    "for-each-ref",
+    "--format=%(refname:short)",
+    remoteRef
+  ]);
+  if (!out) return [];
+  const branches = out.split("\n").map((s) => s.trim()).filter(Boolean).map((s) => s.startsWith("origin/") ? s.slice("origin/".length) : s).filter((s) => s !== "HEAD");
+  return [...new Set(branches)];
+}
+async function getCurrentBranch(repoRoot) {
+  return currentBranch(import_node_path8.default.resolve(repoRoot));
 }
 
 // src/bootstrap/template.ts
@@ -28065,13 +28907,54 @@ function renderMappingsYaml(r) {
 // src/cli.ts
 var program2 = new Command();
 program2.name("volt-notion-sync").description("Sync a Notion teamspace to/from a project repo as markdown").version("0.2.0");
-program2.command("pull").description("Pull Notion \u2192 repo").option("--repo <path>", "project repo root", process.cwd()).option("--token <token>", "Notion integration token (defaults to $NOTION_TOKEN)").action(async (opts) => {
+program2.command("pull").description("Pull Notion \u2192 repo").option("--repo <path>", "project repo root", process.cwd()).option("--token <token>", "Notion integration token (defaults to $NOTION_TOKEN)").option(
+  "--entity <id>",
+  "Targeted pull: only sync the mapping containing this Notion entity id (typically from a webhook). Skips the full per-mapping walk for unrelated mappings."
+).option(
+  "--entity-type <type>",
+  "Type hint for --entity (page|database|data_source|block|comment). Defaults to page."
+).option(
+  "--event <eventType>",
+  "Notion webhook event type (e.g. page.content_updated, page.deleted, data_source.schema_updated). Drives delete handling and ignores comments/locks."
+).option(
+  "--prefer-local",
+  "On conflict (local file changed AND Notion changed), keep the local file untouched. Equivalent to conflictPolicy=github-wins for this invocation. Use when running on a feature branch so agent edits are never clobbered by a stray Notion update.",
+  false
+).action(async (opts) => {
   const { config, client, mappings, repoRoot } = await prepare(opts);
-  const result = await pull({ client, repoRoot, config, mappings, log: (m) => console.log(m) });
+  if (opts.entity) {
+    const result2 = await pullEntity({
+      client,
+      repoRoot,
+      config,
+      mappings,
+      entityId: opts.entity,
+      entityType: opts.entityType,
+      eventType: opts.event,
+      log: (m) => console.log(m)
+    });
+    console.log(JSON.stringify(result2, null, 2));
+    return;
+  }
+  const result = await pull({
+    client,
+    repoRoot,
+    config,
+    mappings,
+    log: (m) => console.log(m),
+    conflictPolicyOverride: opts.preferLocal ? "github-wins" : void 0
+  });
   console.log(JSON.stringify(redactConflicts(result), null, 2));
 });
-program2.command("push").description("Push repo \u2192 Notion").option("--repo <path>", "project repo root", process.cwd()).option("--token <token>", "Notion integration token (defaults to $NOTION_TOKEN)").option("--mapping <name>", "Only push files belonging to mapping <name>").action(async (opts) => {
+program2.command("push").description("Push repo \u2192 Notion").option("--repo <path>", "project repo root", process.cwd()).option("--token <token>", "Notion integration token (defaults to $NOTION_TOKEN)").option("--mapping <name>", "Only push files belonging to mapping <name>").option(
+  "--allow-non-default-branch",
+  "Allow push to run from a non-default branch. Off by default because pushing a feature branch back to Notion would clobber other branches\u2019 work (Notion has one canonical state per page).",
+  false
+).action(async (opts) => {
   const { config, client, mappings, repoRoot } = await prepare(opts);
+  if (!opts.allowNonDefaultBranch) {
+    await assertDefaultBranchForPush(repoRoot);
+  }
   const filtered = opts.mapping ? filterMappingByName(mappings, opts.mapping) : mappings;
   const result = await push({
     client,
@@ -28081,6 +28964,23 @@ program2.command("push").description("Push repo \u2192 Notion").option("--repo <
     log: (m) => console.log(m)
   });
   console.log(JSON.stringify(result, null, 2));
+});
+program2.command("pull-branches").description(
+  "Propagate Notion edits to branches matching a pattern (default: `feature/*`). For each branch: checkout, pull with prefer-local (agent edits win on conflict), commit `.volt/` deltas, push. Run `pull` on the default branch first via the normal flow."
+).option("--repo <path>", "project repo root", process.cwd()).option("--token <token>", "Notion integration token (defaults to $NOTION_TOKEN)").option("--pattern <pattern>", "Glob-style branch name pattern (passed to git for-each-ref)", "feature/*").option("--no-fetch", "Skip the initial `git fetch --prune`").option("--no-push", "Run pull + commit but skip pushing back to origin (dry run)").option("--message <msg>", "Commit message for the per-branch sync commit").action(async (opts) => {
+  const { config, client, mappings, repoRoot } = await prepare(opts);
+  const result = await pullFeatureBranches({
+    client,
+    repoRoot,
+    config,
+    mappings,
+    pattern: opts.pattern,
+    fetch: opts.fetch !== false,
+    push: opts.push !== false,
+    commitMessage: opts.message,
+    log: (m) => console.log(m)
+  });
+  console.log(JSON.stringify(redactBranchResult(result), null, 2));
 });
 program2.command("sync").description("Pull then push, with conflict policy applied").option("--repo <path>", "project repo root", process.cwd()).option("--token <token>", "Notion integration token (defaults to $NOTION_TOKEN)").option("--strategy <strategy>", "Only sync mappings with commitStrategy <direct|pr>").action(async (opts) => {
   const { config, client, mappings, repoRoot } = await prepare(opts);
@@ -28114,8 +29014,40 @@ program2.command("inspect").description("List the children under rootPageId \u20
     console.log(`  [${c.kind}] ${c.title}  (${c.id})`);
   }
 });
+program2.command("resolve").description(
+  "Print the effective merged config (repo + STANDARD_MAPPINGS). Offline \u2014 no Notion calls."
+).option("--repo <path>", "project repo root", process.cwd()).option("--json", "Emit JSON instead of human-readable text").action(async (opts) => {
+  const repoRoot = import_node_path9.default.resolve(opts.repo);
+  const config = await loadConfigOrDie(repoRoot);
+  if (opts.json) {
+    console.log(JSON.stringify(config, null, 2));
+    return;
+  }
+  console.log(`teamspaceId: ${config.notion.teamspaceId}`);
+  console.log(`rootPageId:  ${config.notion.rootPageId}`);
+  console.log(`useStandardMappings: ${config.useStandardMappings}`);
+  console.log(`defaultDirection: ${config.defaultDirection}`);
+  console.log(`commitStrategy:   ${config.commitStrategy}`);
+  console.log(`conflictPolicy:   ${config.conflictPolicy}`);
+  console.log("");
+  console.log(`mappings (${config.mappings.length}):`);
+  for (const m of config.mappings) {
+    const flags = [
+      m.optional ? "optional" : "",
+      m.disabled ? "DISABLED" : "",
+      m.direction ? `direction=${m.direction}` : "",
+      m.commitStrategy ? `commit=${m.commitStrategy}` : ""
+    ].filter(Boolean).join(" ");
+    console.log(
+      `  [${m.type}] ${m.notion ?? m.notionId} \u2192 .volt/${m.local}${flags ? "  (" + flags + ")" : ""}`
+    );
+  }
+  console.log("");
+  console.log(`notionIgnore: ${JSON.stringify(config.notionIgnore)}`);
+  console.log(`localIgnore:  ${JSON.stringify(config.localIgnore)}`);
+});
 program2.command("routes").description("Print mappings classified by commitStrategy as JSON (used by GH Actions)").option("--repo <path>", "project repo root", process.cwd()).option("--token <token>", "Notion integration token (defaults to $NOTION_TOKEN)").option("--no-resolve", "Do not contact Notion; classify by static config only").action(async (opts) => {
-  const repoRoot = import_node_path6.default.resolve(opts.repo);
+  const repoRoot = import_node_path9.default.resolve(opts.repo);
   const config = await loadConfigOrDie(repoRoot);
   const direct = [];
   const pr = [];
@@ -28123,7 +29055,7 @@ program2.command("routes").description("Print mappings classified by commitStrat
     const strategy = m.commitStrategy ?? config.commitStrategy;
     const pathPattern = `.volt/${m.local}/**`;
     if (strategy === "pr") {
-      pr.push({ name: m.notion ?? m.notionId ?? m.local, paths: [pathPattern] });
+      pr.push({ name: m.notion ?? m.notionId ?? m.local ?? "<unnamed>", paths: [pathPattern] });
     } else {
       direct.push(pathPattern);
     }
@@ -28147,31 +29079,31 @@ program2.command("bootstrap").description(
   console.log(renderMappingsYaml(result));
 });
 program2.command("scaffold").description("Drop the workflow + config templates and CLI bundle into the current repo").option("--repo <path>", "project repo root", process.cwd()).option("--force", "overwrite existing files", false).option("--bundle <path>", "path to volt-notion-sync.cjs to copy into .volt/.cli/").action(async (opts) => {
-  const repoRoot = import_node_path6.default.resolve(opts.repo);
+  const repoRoot = import_node_path9.default.resolve(opts.repo);
   const targets = [
-    { to: import_node_path6.default.join(repoRoot, ".volt", ".volt-sync.yml"), content: QUICKSTART_TEMPLATE_YAML },
+    { to: import_node_path9.default.join(repoRoot, ".volt", ".volt-sync.yml"), content: QUICKSTART_TEMPLATE_YAML },
     {
-      to: import_node_path6.default.join(repoRoot, ".github", "workflows", "volt-notion-sync.yml"),
+      to: import_node_path9.default.join(repoRoot, ".github", "workflows", "volt-notion-sync.yml"),
       content: WORKFLOW_TEMPLATE_YAML
     }
   ];
   for (const t of targets) {
     if (!opts.force && await exists(t.to)) {
-      console.log(`skip (exists): ${import_node_path6.default.relative(repoRoot, t.to)}`);
+      console.log(`skip (exists): ${import_node_path9.default.relative(repoRoot, t.to)}`);
       continue;
     }
-    await (0, import_promises8.mkdir)(import_node_path6.default.dirname(t.to), { recursive: true });
-    await (0, import_promises8.writeFile)(t.to, t.content, "utf-8");
-    console.log(`wrote: ${import_node_path6.default.relative(repoRoot, t.to)}`);
+    await (0, import_promises10.mkdir)(import_node_path9.default.dirname(t.to), { recursive: true });
+    await (0, import_promises10.writeFile)(t.to, t.content, "utf-8");
+    console.log(`wrote: ${import_node_path9.default.relative(repoRoot, t.to)}`);
   }
   if (opts.bundle) {
-    const dest = import_node_path6.default.join(repoRoot, ".volt", ".cli", "volt-notion-sync.cjs");
+    const dest = import_node_path9.default.join(repoRoot, ".volt", ".cli", "volt-notion-sync.cjs");
     if (!opts.force && await exists(dest)) {
-      console.log(`skip (exists): ${import_node_path6.default.relative(repoRoot, dest)} (use --force to update)`);
+      console.log(`skip (exists): ${import_node_path9.default.relative(repoRoot, dest)} (use --force to update)`);
     } else {
-      await (0, import_promises8.mkdir)(import_node_path6.default.dirname(dest), { recursive: true });
-      await (0, import_promises8.copyFile)(opts.bundle, dest);
-      console.log(`wrote: ${import_node_path6.default.relative(repoRoot, dest)}`);
+      await (0, import_promises10.mkdir)(import_node_path9.default.dirname(dest), { recursive: true });
+      await (0, import_promises10.copyFile)(opts.bundle, dest);
+      console.log(`wrote: ${import_node_path9.default.relative(repoRoot, dest)}`);
     }
   } else {
     console.log("note: pass --bundle <path> to copy the CLI bundle into .volt/.cli/");
@@ -28180,7 +29112,7 @@ program2.command("scaffold").description("Drop the workflow + config templates a
 async function prepare(opts) {
   const token = opts.token || process.env.NOTION_TOKEN;
   if (!token) die("NOTION_TOKEN is required (env var or --token)");
-  const repoRoot = import_node_path6.default.resolve(opts.repo);
+  const repoRoot = import_node_path9.default.resolve(opts.repo);
   const config = await loadConfigOrDie(repoRoot);
   const client = createNotionClient({ token });
   const mappings = await resolveMappings(client, config);
@@ -28199,6 +29131,37 @@ function redactConflicts(result) {
     conflicts: result.conflicts.map(({ mapping, ...rest }) => rest)
   };
 }
+function redactBranchResult(result) {
+  return {
+    ...result,
+    branches: result.branches.map((b) => ({
+      ...b,
+      pull: redactConflicts(b.pull)
+    }))
+  };
+}
+async function assertDefaultBranchForPush(repoRoot) {
+  const current = await getCurrentBranch(repoRoot).catch(() => null);
+  if (!current) {
+    die("cannot determine current git branch \u2014 run from inside the repo");
+  }
+  let defaultBranch = null;
+  try {
+    const out = (0, import_node_child_process3.execSync)("git symbolic-ref refs/remotes/origin/HEAD", {
+      cwd: repoRoot,
+      encoding: "utf-8"
+    }).trim();
+    const m = /^refs\/remotes\/origin\/(.+)$/.exec(out);
+    if (m) defaultBranch = m[1] ?? null;
+  } catch {
+    defaultBranch = current === "master" ? "master" : "main";
+  }
+  if (defaultBranch && current !== defaultBranch) {
+    die(
+      `push refuses to run from \`${current}\` \u2014 default branch is \`${defaultBranch}\`. Pushing a feature branch back to Notion would overwrite shared state. If you really mean it, pass --allow-non-default-branch.`
+    );
+  }
+}
 async function loadConfigOrDie(repoRoot) {
   try {
     return await loadConfig(repoRoot);
@@ -28209,7 +29172,7 @@ async function loadConfigOrDie(repoRoot) {
 }
 async function exists(p) {
   try {
-    await (0, import_promises8.access)(p);
+    await (0, import_promises10.access)(p);
     return true;
   } catch {
     return false;

@@ -461,12 +461,14 @@ notion:
   teamspaceId: REPLACE_WITH_TEAMSPACE_UUID
   rootPageId:  REPLACE_WITH_PROJECT_HOME_PAGE_UUID
 
-# Run a 3-way \`git merge-file\` when the same page changed in both
-# Notion and the repo since the last sync. Non-overlapping edits from
-# each side are preserved; overlapping edits resolve to Notion's
-# version. The alternative ('abort') aborts the GitHub Action when
-# anything conflicts, which blocks the sync until a human intervenes.
-conflictPolicy: merge-prefer-notion
+# Notion is the source of truth for updates. If the same page changed
+# in both Notion and the repo since the last sync, Notion wins
+# wholesale — the local file is overwritten on pull, and push refuses
+# to overwrite a Notion page whose last_edited_time has advanced past
+# our recorded sync point. Push will NEVER delete a page in Notion
+# (child_page / child_database / their layout-container parents are
+# preserved across every push).
+conflictPolicy: notion-wins
 
 # Standard mappings (Process Flows, Waterfall Tasks, Project Definition,
 # Meetings) come from the CLI — see STANDARD_MAPPINGS in
