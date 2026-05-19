@@ -8,5 +8,6 @@ Every repo that consumes this CLI (via `npx github:Volt-Technologies/Volt-Notion
 - `OnwardReserve`
 - `RL-Williams-Company`
 - `WhiteAndWarren`
+- `International-Wholesale`
 
-Each has a `.volt/.volt-sync.yml` config and a GitHub Actions workflow that pulls/pushes on a webhook + cron + manual trigger. When making changes to the CLI that consumers need to opt into (new config keys, behavioral toggles), update all four `.volt-sync.yml` files in the same change.
+Each has a `.volt/.volt-sync.yml` config and a GitHub Actions workflow that pulls/pushes on a webhook + cron + manual trigger. When making changes to the CLI that consumers need to opt into (new config keys, behavioral toggles), update all five `.volt-sync.yml` files in the same change.
