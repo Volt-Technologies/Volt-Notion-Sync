@@ -6,6 +6,7 @@ dist/
 .DS_Store
 .tmp-pilot/
 .claude/
+CLAUDE.md
 
 # Logic App workflow definition holds parameter defaultValues that may
 # contain rotated secrets when the user pastes them locally before
