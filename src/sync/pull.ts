@@ -179,7 +179,7 @@ async function pullPageTree(
     const fileRel = path.posix.join(mapping.local, ...relSegments) + '.md';
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
 
-    const md = await pageBlocksToMarkdown(opts.client, node.id);
+    const { markdown: md } = await pageBlocksToMarkdown(opts.client, node.id);
     const notionContent = renderMarkdownFile(opts.config, node, md);
     const written = await writeWithMerge(filePath, notionContent, node.id, state, mergeMap, log);
     writtenPaths.add(path.normalize(filePath));
@@ -265,7 +265,7 @@ async function pullEmbeddedDatabase(
     const rowSlug = slugify(row.title || row.id);
     const fileRel = path.posix.join(baseFolder, rowSlug + '.md');
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
-    const body = await pageBlocksToMarkdown(opts.client, row.id);
+    const { markdown: body } = await pageBlocksToMarkdown(opts.client, row.id);
     const notionContent = renderRowMarkdown(opts.config, row, exp, body);
     const written = await writeWithMerge(filePath, notionContent, row.id, state, mergeMap, opts.log ?? (() => {}));
     writtenPaths.add(path.normalize(filePath));
@@ -315,6 +315,7 @@ async function pullDatabase(
   writtenPaths.add(path.normalize(indexFull));
 
   let rowsWritten = 0;
+  let rowsSkipped = 0;
   for (const row of exp.rows) {
     if (isIgnoredNotion([row.title], opts.config.notionIgnore)) continue;
     if (skipIds.has(row.id)) continue;
@@ -330,7 +331,43 @@ async function pullDatabase(
       rowSlug + '.md',
     );
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
-    const body = await pageBlocksToMarkdown(opts.client, row.id);
+
+    // Incremental skip: when Notion's last_edited_time matches what we
+    // last wrote to disk and the row isn't in conflict, the body and
+    // child-page block list are guaranteed identical — Notion bumps the
+    // row's timestamp on any structural change inside it. Reuse the
+    // local file and skip pageBlocksToMarkdown + child-page walk
+    // entirely. This is the difference between a 1000-call full pull
+    // and a ~5-call no-op pull on subsequent CI runs.
+    const inConflict = mergeMap.has(row.id);
+    const localLastEdited = await readLocalLastEditedTime(filePath);
+    if (!inConflict && localLastEdited === row.lastEditedTime) {
+      const localContent = await readFile(filePath, 'utf-8');
+      writtenPaths.add(path.normalize(filePath));
+      // Child pages live under <rowSlug>/ — preserve them so prune
+      // doesn't wipe an unchanged subtree.
+      const childDir = path.join(
+        opts.repoRoot,
+        '.volt',
+        mapping.local,
+        ...(groupSlug ? [groupSlug] : []),
+        rowSlug,
+      );
+      if (await directoryExists(childDir)) {
+        await markSubtreeWritten(childDir, writtenPaths);
+      }
+      state.entries[row.id] = {
+        notionId: row.id,
+        localPath: fileRel,
+        notionLastEditedTime: row.lastEditedTime,
+        contentHash: hashContent(localContent),
+        baseContent: localContent,
+      };
+      rowsSkipped += 1;
+      continue;
+    }
+
+    const { markdown: body, childPageIds } = await pageBlocksToMarkdown(opts.client, row.id);
     const notionContent = renderRowMarkdown(opts.config, row, exp, body);
     const written = await writeWithMerge(filePath, notionContent, row.id, state, mergeMap, log);
     writtenPaths.add(path.normalize(filePath));
@@ -346,23 +383,30 @@ async function pullDatabase(
 
     // Recursively pull any child pages of this row. Each becomes a nested
     // markdown file beside the row at projectmanagement/<db>/<row-slug>/...
-    // (or under the group folder if groupByProperty is set).
-    const childPagesWritten = await pullRowChildPages(
-      opts,
-      mapping,
-      row,
-      rowSlug,
-      groupSlug,
-      state,
-      writtenPaths,
-      skipIds,
-      mergeMap,
-    );
-    if (childPagesWritten > 0) {
-      log(`    + ${childPagesWritten} child page(s) under ${rowSlug}/`);
+    // (or under the group folder if groupByProperty is set). Skip the
+    // walk entirely when the row has no child_page blocks — saves 2 API
+    // calls per leaf row (most rows), which dominates large-DB pull cost.
+    if (childPageIds.length > 0) {
+      const childPagesWritten = await pullRowChildPages(
+        opts,
+        mapping,
+        row,
+        rowSlug,
+        groupSlug,
+        state,
+        writtenPaths,
+        skipIds,
+        mergeMap,
+      );
+      if (childPagesWritten > 0) {
+        log(`    + ${childPagesWritten} child page(s) under ${rowSlug}/`);
+      }
     }
   }
-  log(`  database rows: ${rowsWritten}`);
+  log(
+    `  database rows: ${rowsWritten}` +
+      (rowsSkipped > 0 ? ` (${rowsSkipped} unchanged, reused from local)` : ''),
+  );
   return { rowsWritten };
 }
 
@@ -426,7 +470,7 @@ async function pullRowChildPages(
     );
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
 
-    const body = await pageBlocksToMarkdown(opts.client, node.id);
+    const { markdown: body } = await pageBlocksToMarkdown(opts.client, node.id);
     const notionContent = renderChildPageMarkdown(opts.config, node, row.id, body);
     const log = opts.log ?? (() => {});
     const writtenContent = await writeWithMerge(filePath, notionContent, node.id, state, mergeMap, log);
@@ -497,6 +541,57 @@ function renderRowMarkdown(
 export async function writeFileEnsured(filePath: string, content: string): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, content, 'utf-8');
+}
+
+// Incremental sync helper: pull the previous pull's `last_edited_time`
+// off the local file's YAML frontmatter so we can detect "Notion hasn't
+// changed this row/page since we last wrote it." Returns null when the
+// file is missing or has no frontmatter — both indistinguishable from
+// "needs a full fetch."
+async function readLocalLastEditedTime(filePath: string): Promise<string | null> {
+  let content: string;
+  try {
+    content = await readFile(filePath, 'utf-8');
+  } catch {
+    return null;
+  }
+  const m = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!m) return null;
+  try {
+    const fm = YAML.parse(m[1]!) as { last_edited_time?: unknown };
+    return typeof fm.last_edited_time === 'string' ? fm.last_edited_time : null;
+  } catch {
+    return null;
+  }
+}
+
+async function directoryExists(dir: string): Promise<boolean> {
+  try {
+    const s = await stat(dir);
+    return s.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+// Mark every existing .md under `dir` as written so the prune pass
+// leaves them alone. Used when an incremental skip reuses a whole
+// subtree without re-fetching it from Notion.
+async function markSubtreeWritten(dir: string, writtenPaths: Set<string>): Promise<void> {
+  try {
+    const entries = await readdir(dir);
+    for (const name of entries) {
+      const full = path.join(dir, name);
+      const s = await stat(full);
+      if (s.isDirectory()) {
+        await markSubtreeWritten(full, writtenPaths);
+      } else {
+        writtenPaths.add(path.normalize(full));
+      }
+    }
+  } catch {
+    // Missing directory — nothing to mark.
+  }
 }
 
 async function pruneStale(

@@ -43,11 +43,12 @@ const MAX_DELAY_MS = 60_000;
 const RATE_LIMIT_BASE_DELAY_MS = 30_000;
 const RATE_LIMIT_MAX_DELAY_MS = 180_000;
 
-// Notion's documented limit is an average of 3 requests/second per
-// integration. Serializing requests with a ~400ms floor keeps us at
-// ~2.5 req/s — under the limit with margin for burst tolerance. The
-// queue is global to the client so concurrent callers don't bypass it.
-const MIN_REQUEST_INTERVAL_MS = 400;
+// Notion's documented limit is "an average of 3 requests/second" per
+// integration measured on a rolling window. Empirically a 400ms floor
+// (2.5 req/s) still trips throttling on multi-database pulls that run
+// 1000+ calls sustained, so we drop to 500ms (2 req/s) for headroom.
+// The queue is global to the client so concurrent callers don't bypass it.
+const MIN_REQUEST_INTERVAL_MS = 500;
 let lastRequestAt = 0;
 let requestChain: Promise<unknown> = Promise.resolve();
 

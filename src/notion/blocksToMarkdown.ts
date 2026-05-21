@@ -61,6 +61,11 @@ interface RenderContext {
   client: Client;
   indent: string;
   numberedCounter: number[];
+  // Mutable collectors populated as the render walks blocks. Callers
+  // reuse these instead of issuing a separate walkPageTree pass just
+  // to discover nested pages/databases, which doubles API cost per row.
+  childPageIds: string[];
+  childDatabaseIds: string[];
 }
 
 async function renderChildren(
@@ -172,11 +177,25 @@ async function renderBlock(client: Client, block: Block, ctx: RenderContext): Pr
       return `${indent}$$${block.equation?.expression ?? ''}$$\n`;
     case 'child_page': {
       const title = block.child_page?.title ?? 'Untitled';
+      ctx.childPageIds.push(block.id);
       return `${indent}- [${title}](./${slugify(title)}/index.md)\n`;
     }
     case 'child_database': {
       const title = block.child_database?.title ?? 'Untitled';
+      ctx.childDatabaseIds.push(block.id);
       return `${indent}- [Database: ${title}](./${slugify(title)}/_index.json)\n`;
+    }
+    // Layout containers that wrap content visually but don't render as
+    // markdown themselves. Descend silently so any nested child_page /
+    // child_database blocks are still collected into ctx (parity with
+    // walker.ts collectNamedChildren).
+    case 'column_list':
+    case 'column':
+    case 'synced_block': {
+      if (block.has_children) {
+        return await renderChildren(client, block.id, { ...ctx, indent, numberedCounter: [] });
+      }
+      return '';
     }
     default:
       return `${indent}<!-- unsupported block: ${block.type} -->\n`;
@@ -206,9 +225,27 @@ async function renderBlocks(
   return out;
 }
 
-export async function pageBlocksToMarkdown(client: Client, pageId: string): Promise<string> {
+export interface PageRenderResult {
+  markdown: string;
+  childPageIds: string[];
+  childDatabaseIds: string[];
+}
+
+export async function pageBlocksToMarkdown(
+  client: Client,
+  pageId: string,
+): Promise<PageRenderResult> {
   const blocks = (await listChildBlocks(client, pageId)) as unknown as Block[];
-  return await renderBlocks(client, blocks, { client, indent: '', numberedCounter: [] });
+  const childPageIds: string[] = [];
+  const childDatabaseIds: string[] = [];
+  const markdown = await renderBlocks(client, blocks, {
+    client,
+    indent: '',
+    numberedCounter: [],
+    childPageIds,
+    childDatabaseIds,
+  });
+  return { markdown, childPageIds, childDatabaseIds };
 }
 
 export function slugify(name: string, opts: { preserveCase?: boolean } = {}): string {
