@@ -10,11 +10,11 @@ export interface NotionClientOptions {
   notionVersion?: string;
 }
 
-// Wrap the SDK so every request gets a longer timeout and automatic
-// retry on transient failures (timeouts, 5xx, 429). The default
+// Wrap the SDK so every request gets a longer timeout, a global rate
+// throttle, and automatic retry on transient failures. The default
 // timeout is 60s; bumped to 120s because the deep canonical-DB scan
 // can chain enough requests on a slow Notion that any one of them
-// blows past 60s. Retry uses exponential backoff capped at 30s.
+// blows past 60s.
 export function createNotionClient(opts: NotionClientOptions): Client {
   const client = new Client({
     auth: opts.token,
@@ -24,23 +24,46 @@ export function createNotionClient(opts: NotionClientOptions): Client {
 
   // The SDK's typed methods (pages.retrieve, blocks.children.list,
   // search, etc.) all funnel through `client.request`. Patching it
-  // once retries every HTTP call without double-wrapping.
+  // once throttles + retries every HTTP call without double-wrapping.
   const origRequest = client.request.bind(client) as (args: unknown) => Promise<unknown>;
   (client as unknown as { request: typeof origRequest }).request = (args: unknown) =>
-    withRetry(() => origRequest(args));
+    withRetry(() => throttle(() => origRequest(args)));
 
   return client;
 }
 
 const TRANSIENT_HTTP_STATUSES = new Set([429, 500, 502, 503, 504]);
-const MAX_ATTEMPTS = 6;
+const MAX_ATTEMPTS = 8;
 const BASE_DELAY_MS = 1_000;
 const MAX_DELAY_MS = 60_000;
 // Notion's rate-limit response says "try again in a few minutes" with
-// no programmatic backoff hint exposed by the SDK. Use a longer floor
-// for rate_limited specifically so we don't burn through retries while
-// still well under the cooldown.
+// no programmatic backoff hint exposed by the SDK. Cap rate-limit
+// waits high enough to ride out the cooldown (3min) rather than burn
+// through retries while still well under it.
 const RATE_LIMIT_BASE_DELAY_MS = 30_000;
+const RATE_LIMIT_MAX_DELAY_MS = 180_000;
+
+// Notion's documented limit is an average of 3 requests/second per
+// integration. Serializing requests with a ~400ms floor keeps us at
+// ~2.5 req/s — under the limit with margin for burst tolerance. The
+// queue is global to the client so concurrent callers don't bypass it.
+const MIN_REQUEST_INTERVAL_MS = 400;
+let lastRequestAt = 0;
+let requestChain: Promise<unknown> = Promise.resolve();
+
+function throttle<T>(fn: () => Promise<T>): Promise<T> {
+  const next = requestChain.then(async () => {
+    const now = Date.now();
+    const wait = Math.max(0, lastRequestAt + MIN_REQUEST_INTERVAL_MS - now);
+    if (wait > 0) await sleep(wait);
+    lastRequestAt = Date.now();
+    return fn();
+  });
+  // Keep the chain alive even if this call rejects, so a single
+  // failure doesn't poison every subsequent request.
+  requestChain = next.catch(() => undefined);
+  return next as Promise<T>;
+}
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   let lastErr: unknown;
@@ -53,7 +76,8 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
       const isRateLimited =
         err instanceof APIResponseError && err.code === 'rate_limited';
       const baseDelay = isRateLimited ? RATE_LIMIT_BASE_DELAY_MS : BASE_DELAY_MS;
-      const delay = Math.min(MAX_DELAY_MS, baseDelay * 2 ** (attempt - 1));
+      const maxDelay = isRateLimited ? RATE_LIMIT_MAX_DELAY_MS : MAX_DELAY_MS;
+      const delay = Math.min(maxDelay, baseDelay * 2 ** (attempt - 1));
       const jitter = Math.floor(Math.random() * 1_000);
       // Make retries observable in CI logs so a slow/rate-limited
       // run doesn't look silently stuck.
