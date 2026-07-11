@@ -621,6 +621,17 @@ async function pruneStale(
         // path with forward slashes (minimatch convention).
         const relFromVolt = path.relative(voltRoot, f).split(path.sep).join('/');
         if (matchesAny(relFromVolt, localIgnore)) continue;
+        // Local-born guard: a file with no notion_id in its frontmatter
+        // never came from Notion — it's a new row/page created repo-side
+        // (e.g. an extension created directly in the Volt platform)
+        // waiting for the push leg to create it in Notion and write the
+        // id back. Prune must not eat it. Only files that provably
+        // mirrored a Notion page (they carry notion_id) are stale when
+        // their source row disappears.
+        if (!(await hasNotionId(f))) {
+          log(`  kept (local-born, no notion_id): ${path.relative(repoRoot, f)}`);
+          continue;
+        }
         await rm(f, { force: true });
         log(`  pruned: ${path.relative(repoRoot, f)}`);
         deleted += 1;
@@ -630,6 +641,26 @@ async function pruneStale(
     }
   }
   return deleted;
+}
+
+// Does the file's YAML frontmatter carry a notion_id? Errors (missing
+// file, no frontmatter, malformed YAML) all report false — the prune
+// caller treats false as "keep", so unparseable files are never deleted.
+async function hasNotionId(filePath: string): Promise<boolean> {
+  let content: string;
+  try {
+    content = await readFile(filePath, 'utf-8');
+  } catch {
+    return false;
+  }
+  const m = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!m) return false;
+  try {
+    const fm = YAML.parse(m[1]!) as { notion_id?: unknown };
+    return typeof fm.notion_id === 'string' && fm.notion_id.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 async function listFilesRecursive(dir: string): Promise<string[]> {

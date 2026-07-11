@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { access, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import YAML from 'yaml';
 import type { Client } from '@notionhq/client';
@@ -73,7 +73,7 @@ export async function push(opts: PushOptions): Promise<PushResult> {
     }
     const depth = fileDepth(file);
     if (file.mapping.type === 'database') {
-      if (depth === 1) {
+      if (await isDatabaseRow(file, depth)) {
         await pushDatabaseRow(opts, file, parsed, state, result, log);
       } else {
         await pushRowChildPage(opts, file, parsed, state, result, log);
@@ -95,6 +95,25 @@ function fileDepth(file: LocalFile): number {
   const mappingPrefix = file.mapping.local.replace(/\\/g, '/').replace(/\/$/, '') + '/';
   const tail = file.relPath.startsWith(mappingPrefix) ? file.relPath.slice(mappingPrefix.length) : file.relPath;
   return tail.split('/').length;
+}
+
+// Is this file a database ROW (vs a row child page)? Depth 1 is always a
+// row. With `groupByProperty` set, pull sorts rows one level deeper —
+// <local>/<group>/<slug>.md — so a depth-2 file is a row too, UNLESS a
+// sibling "<dir>.md" exists: rows whose group property is empty fall back
+// to the flat layout, and *their* child pages also land at depth 2, with
+// the flat row file as the disambiguator. Group folders never have a
+// matching .md beside them. Anything deeper is always a child page.
+async function isDatabaseRow(file: LocalFile, depth: number): Promise<boolean> {
+  if (depth === 1) return true;
+  if (!file.mapping.groupByProperty || depth !== 2) return false;
+  const parentFile = path.dirname(file.absPath) + '.md';
+  try {
+    await access(parentFile);
+    return false; // parent row exists → this is its child page
+  } catch {
+    return true; // no parent .md → the dir is a group folder, this is a row
+  }
 }
 
 async function pushPage(
