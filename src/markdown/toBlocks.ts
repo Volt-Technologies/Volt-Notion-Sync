@@ -46,7 +46,7 @@ function tokenToBlocks(token: Token): NotionBlock[] {
       const t = token as Tokens.Paragraph;
       const inner = t.tokens ?? [];
       const onlyToken = inner.length === 1 ? inner[0] : null;
-      if (onlyToken?.type === 'image') {
+      if (onlyToken?.type === 'image' && isPushableUrl((onlyToken as Tokens.Image).href)) {
         const img = onlyToken as Tokens.Image;
         return [
           {
@@ -62,7 +62,7 @@ function tokenToBlocks(token: Token): NotionBlock[] {
           },
         ];
       }
-      if (onlyToken?.type === 'link') {
+      if (onlyToken?.type === 'link' && isPushableUrl((onlyToken as Tokens.Link).href)) {
         const link = onlyToken as Tokens.Link;
         if (isVideoUrl(link.href)) {
           return [
@@ -116,6 +116,12 @@ function tokenToBlocks(token: Token): NotionBlock[] {
       const t = token as Tokens.List;
       const out: NotionBlock[] = [];
       for (const item of t.items) {
+        // Sub-page / embedded-database markers written by blocksToMarkdown
+        // are structure, not content. The real child_page / child_database
+        // blocks are preserved untouched by replacePageBlocks, so pushing
+        // the marker back would duplicate the child as a plain bullet —
+        // and its relative href isn't a URL Notion will accept anyway.
+        if (isChildMarker(extractItemText(item))) continue;
         out.push(listItemToBlock(item, t.ordered));
       }
       return out;
@@ -252,9 +258,10 @@ function childrenRich(tokens: Token[], ann: Annotations, link: string | undefine
 }
 
 function textRich(content: string, ann: Annotations, link: string | undefined): RichText {
+  const url = link && isPushableUrl(link) ? link : null;
   const rt: RichText = {
     type: 'text',
-    text: { content: truncate(content), link: link ? { url: link } : null },
+    text: { content: truncate(content), link: url ? { url } : null },
   };
   if (ann.bold || ann.italic || ann.strikethrough || ann.code) rt.annotations = ann;
   return rt;
@@ -309,6 +316,30 @@ function isVideoUrl(url: string): boolean {
 
 function isBareUrlText(text: string, href: string): boolean {
   return text.trim() === href.trim();
+}
+
+// Notion rejects any href that isn't an absolute URL with
+// "Content creation Failed. Fix the following: Invalid URL for link." and
+// that error fails the entire push, not just the one block. Relative hrefs
+// are common in this corpus — our own sub-page markers, plus anything a
+// user pastes into Notion that round-trips through markdown — so links we
+// can't push degrade to plain text instead of aborting the run.
+function isPushableUrl(href: string): boolean {
+  if (!href) return false;
+  try {
+    new URL(href);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// A `- [Title](./slug/index.md)` / `- [Database: Title](./slug/_index.json)`
+// line as emitted by blocksToMarkdown for child_page / child_database.
+const CHILD_MARKER = /^\[[^\]]*\]\(\.\/[^)]*\/(?:index\.md|_index\.json)\)$/;
+
+function isChildMarker(itemText: string): boolean {
+  return CHILD_MARKER.test(itemText.trim());
 }
 
 function mapCodeLanguage(lang: string | undefined): string {
