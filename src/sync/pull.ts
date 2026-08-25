@@ -258,11 +258,15 @@ async function pullEmbeddedDatabase(
   await writeFileEnsured(indexFull, indexContent);
   writtenPaths.add(path.normalize(indexFull));
 
+  // Same title-collision guard as pullDatabase. Embedded DBs carry no
+  // mapping config, so there is no groupByProperty to partition by.
+  const rowSlugs = assignRowSlugs(exp.rows, undefined, opts.config.notionIgnore);
+
   let rowsWritten = 0;
   for (const row of exp.rows) {
     if (isIgnoredNotion([row.title], opts.config.notionIgnore)) continue;
     if (skipIds.has(row.id)) continue;
-    const rowSlug = slugify(row.title || row.id);
+    const rowSlug = rowSlugs.get(row.id) ?? slugify(row.title || row.id);
     const fileRel = path.posix.join(baseFolder, rowSlug + '.md');
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
     const { markdown: body } = await pageBlocksToMarkdown(opts.client, row.id);
@@ -314,12 +318,17 @@ async function pullDatabase(
   await writeFileEnsured(indexFull, indexContent);
   writtenPaths.add(path.normalize(indexFull));
 
+  // Resolve every row's filename up front — uniqueness is a property of
+  // the row set, not of any one row, so it can't be decided inside the
+  // loop. See assignRowSlugs for the disambiguation rules.
+  const rowSlugs = assignRowSlugs(exp.rows, mapping.groupByProperty, opts.config.notionIgnore);
+
   let rowsWritten = 0;
   let rowsSkipped = 0;
   for (const row of exp.rows) {
     if (isIgnoredNotion([row.title], opts.config.notionIgnore)) continue;
     if (skipIds.has(row.id)) continue;
-    const rowSlug = slugify(row.title || row.id);
+    const rowSlug = rowSlugs.get(row.id) ?? slugify(row.title || row.id);
     // groupByProperty (e.g. "Type") sorts rows into subfolders by the
     // property's value — so a Waterfall Tasks row with Type=Extension
     // lands at projectmanagement/waterfall-tasks/extension/<slug>.md
@@ -408,6 +417,89 @@ async function pullDatabase(
       (rowsSkipped > 0 ? ` (${rowsSkipped} unchanged, reused from local)` : ''),
   );
   return { rowsWritten };
+}
+
+// Assign every row the filename slug it will be written under, keeping
+// them unique within their destination folder.
+//
+// `slugify(row.title)` alone is not injective: recurring meetings give a
+// database many rows sharing one title. Clarion's Transcripts DB has 124
+// rows and only 97 distinct titles — "(Internal) Clarion PMO" appears 10
+// times, "Joe/Kelly Clarion Recurring Call" 9 times. Writing all of them
+// to <slug>.md meant each occurrence silently overwrote the previous one
+// and 27 transcripts never reached the repo, while the run still
+// reported "124 rows written".
+//
+// Rules, chosen so this is a no-op for every row that isn't in a
+// collision (a repo whose titles are already unique sees no renames):
+//   - slug used by exactly one row in the folder → bare <slug>, unchanged
+//   - collision, and every colliding row has a distinct date property →
+//     <slug>-YYYY-MM-DD, which is what a human wants for meeting series
+//   - collision otherwise (missing/duplicate dates) → <slug>-<id8>
+//
+// Both discriminators are derived from stable row data, never from
+// query order or lastEditedTime, so a row keeps its filename across
+// pulls. Grouping is per destination folder, so groupByProperty
+// subfolders are considered independently.
+function assignRowSlugs(
+  rows: NormalizedRow[],
+  groupByProperty: string | undefined,
+  notionIgnore: string[],
+): Map<string, string> {
+  const byTarget = new Map<string, NormalizedRow[]>();
+  for (const row of rows) {
+    if (isIgnoredNotion([row.title], notionIgnore)) continue;
+    const base = slugify(row.title || row.id);
+    const key = `${rowGroupSlug(row, groupByProperty) ?? ''}|${base}`;
+    const bucket = byTarget.get(key);
+    if (bucket) bucket.push(row);
+    else byTarget.set(key, [row]);
+  }
+
+  const out = new Map<string, string>();
+  for (const [key, bucket] of byTarget) {
+    const base = key.slice(key.indexOf('|') + 1);
+    if (bucket.length === 1) {
+      out.set(bucket[0]!.id, base);
+      continue;
+    }
+    const dates = bucket.map((r) => rowDateStamp(r));
+    const datesUsable =
+      dates.every((d): d is string => Boolean(d)) && new Set(dates).size === dates.length;
+    bucket.forEach((row, i) => {
+      out.set(row.id, datesUsable ? `${base}-${dates[i]}` : `${base}-${shortId(row.id)}`);
+    });
+  }
+  return out;
+}
+
+// A date-typed property on the row, as YYYY-MM-DD. Notion dates arrive
+// as either a bare date or a full ISO timestamp; both truncate cleanly
+// at the first 10 characters. Returns undefined when the row has no
+// date property or it is empty.
+//
+// Property names are sorted before picking so a database carrying more
+// than one date column (Waterfall Tasks has both "Due Date" and "Start
+// Date") always yields the same one. Relying on object key order would
+// tie the filename to whatever order the API happened to serialise, and
+// a reorder would silently rename files on the next pull.
+function rowDateStamp(row: NormalizedRow): string | undefined {
+  for (const name of Object.keys(row.rawProperties).sort()) {
+    const p = row.rawProperties[name] as unknown as {
+      type?: string;
+      date?: { start?: string } | null;
+    };
+    if (p?.type !== 'date') continue;
+    const start = p.date?.start;
+    if (start && start.length >= 10) return start.slice(0, 10);
+  }
+  return undefined;
+}
+
+// First 8 hex characters of a Notion UUID — enough to separate rows that
+// collide on both title and date, and stable for the row's lifetime.
+function shortId(id: string): string {
+  return id.replace(/-/g, '').slice(0, 8);
 }
 
 // Read the configured groupByProperty value from a row. Supports the
