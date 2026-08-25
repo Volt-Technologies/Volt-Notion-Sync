@@ -26,10 +26,32 @@
  *   feature-branch state to Notion would clobber other branches' content.
  */
 import { spawn } from 'node:child_process';
+import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { Client } from '@notionhq/client';
 import type { Config, ResolvedMapping } from '../config/types.js';
 import { pull, type PullResult } from './pull.js';
+import { STATE_FILENAME } from './state.js';
+
+const STATE_FILE = `.volt/${STATE_FILENAME}`;
+
+// Return the working tree to a clean state with respect to the sync
+// state file, whatever state it is in.
+//
+// `git checkout --` restores a TRACKED file from HEAD, which covers the
+// steady-state case: the workflow rewrites lastPullAt every pull and
+// deliberately never commits it. But on a repo's first-ever sync the
+// file has never been committed, so it is untracked, `checkout --`
+// fails on an unmatched pathspec, and the file stays in the tree. That
+// is what made the clean-tree assert abort Kanner's first run. Deleting
+// it is safe — it holds only resume state and the next pull rewrites it.
+async function discardStateFile(repoRoot: string): Promise<void> {
+  try {
+    await git(repoRoot, ['checkout', '--', STATE_FILE]);
+  } catch {
+    await rm(path.join(repoRoot, STATE_FILE), { force: true }).catch(() => undefined);
+  }
+}
 
 export interface PullBranchesOptions {
   client: Client;
@@ -82,12 +104,11 @@ export async function pullFeatureBranches(opts: PullBranchesOptions): Promise<Pu
   const doPush = opts.push ?? true;
   const commitMessage = opts.commitMessage ?? 'chore(notion-sync): propagate Notion edits';
 
-  // The workflow's main pull step deliberately leaves
-  // `.volt/.sync-state.json` unstaged (it doesn't push it — see comments
-  // in WORKFLOW_TEMPLATE_YAML). Discard that one file before the
-  // clean-tree check so the dirty state-file timestamp doesn't block
-  // us. Anything else dirty is operator error and should abort.
-  await git(opts.repoRoot, ['checkout', '--', '.volt/.sync-state.json']).catch(() => undefined);
+  // The workflow's main pull step deliberately leaves the state file
+  // dirty or untracked (it never commits it — see WORKFLOW_TEMPLATE_YAML).
+  // Clear just that file before the clean-tree check; anything else dirty
+  // is operator error and should abort.
+  await discardStateFile(opts.repoRoot);
 
   await assertCleanWorkingTree(opts.repoRoot);
   const startedFromBranch = await currentBranch(opts.repoRoot);
@@ -128,7 +149,7 @@ export async function pullFeatureBranches(opts: PullBranchesOptions): Promise<Pu
         // so we don't commit a noisy lastPullAt-only delta on every cron
         // tick (matches the main workflow's convention).
         await git(opts.repoRoot, ['add', '--', '.volt']);
-        await git(opts.repoRoot, ['reset', 'HEAD', '--', '.volt/.sync-state.json']).catch(() => undefined);
+        await git(opts.repoRoot, ['reset', 'HEAD', '--', STATE_FILE]).catch(() => undefined);
         const staged = await git(opts.repoRoot, ['diff', '--cached', '--name-only']);
         const changed = staged.trim().length > 0;
         let pushed = false;
@@ -143,7 +164,7 @@ export async function pullFeatureBranches(opts: PullBranchesOptions): Promise<Pu
           log('  no .volt/ content changes');
           // Discard the in-tree state-file edit so the next checkout
           // doesn't trip over a dirty working tree.
-          await git(opts.repoRoot, ['checkout', '--', '.volt/.sync-state.json']).catch(() => undefined);
+          await discardStateFile(opts.repoRoot);
         }
 
         outcomes.push({ branch, changed, pushed, pull: pullResult });
