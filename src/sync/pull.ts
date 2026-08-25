@@ -435,12 +435,20 @@ async function pullDatabase(
 //   - slug used by exactly one row in the folder → bare <slug>, unchanged
 //   - collision, and every colliding row has a distinct date property →
 //     <slug>-YYYY-MM-DD, which is what a human wants for meeting series
-//   - collision otherwise (missing/duplicate dates) → <slug>-<id8>
+//   - collision otherwise → <slug>[-YYYY-MM-DD]-<id>, with the id prefix
+//     grown until the name is free
 //
-// Both discriminators are derived from stable row data, never from
-// query order or lastEditedTime, so a row keeps its filename across
-// pulls. Grouping is per destination folder, so groupByProperty
-// subfolders are considered independently.
+// Uniqueness is established by claiming names against a per-folder
+// `used` set rather than assumed from the discriminator, because no
+// fixed-length id prefix is safe: Notion mints UUIDs in batches sharing
+// a long common prefix. The candidate list ends at the full 32-hex id,
+// so a free name always exists.
+//
+// Discriminators derive from stable row data, never from query order or
+// lastEditedTime, and both the buckets and the rows inside them are
+// sorted before assignment, so a row keeps its filename across pulls.
+// Grouping is per destination folder, so groupByProperty subfolders are
+// considered independently.
 function assignRowSlugs(
   rows: NormalizedRow[],
   groupByProperty: string | undefined,
@@ -457,20 +465,69 @@ function assignRowSlugs(
   }
 
   const out = new Map<string, string>();
-  for (const [key, bucket] of byTarget) {
+  // One `used` set per destination folder. Uniqueness has to hold across
+  // the whole folder, not just within a title bucket, because a
+  // date-suffixed name from one bucket could in principle equal another
+  // bucket's bare name.
+  const usedByGroup = new Map<string, Set<string>>();
+
+  // Deterministic iteration: sort the bucket keys, and sort rows within
+  // each bucket by id. Assignment therefore does not depend on the order
+  // Notion happened to return rows in, so filenames are stable run over
+  // run.
+  for (const key of [...byTarget.keys()].sort()) {
+    const bucket = byTarget.get(key)!.slice().sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const group = key.slice(0, key.indexOf('|'));
     const base = key.slice(key.indexOf('|') + 1);
-    if (bucket.length === 1) {
-      out.set(bucket[0]!.id, base);
-      continue;
-    }
-    const dates = bucket.map((r) => rowDateStamp(r));
-    const datesUsable =
+    let used = usedByGroup.get(group);
+    if (!used) usedByGroup.set(group, (used = new Set<string>()));
+
+    // Decide the discriminator style once per bucket so every file in a
+    // colliding group is named the same way. Dates only qualify when
+    // every row has one and they are all distinct — otherwise a meeting
+    // series recorded twice on one day would give one row the date and
+    // the next an id, which reads like a mistake.
+    const dates = bucket.map(rowDateStamp);
+    const datesUnique =
       dates.every((d): d is string => Boolean(d)) && new Set(dates).size === dates.length;
-    bucket.forEach((row, i) => {
-      out.set(row.id, datesUsable ? `${base}-${dates[i]}` : `${base}-${shortId(row.id)}`);
-    });
+
+    for (const row of bucket) {
+      for (const candidate of nameCandidates(base, row, bucket.length === 1, datesUnique)) {
+        if (used.has(candidate)) continue;
+        used.add(candidate);
+        out.set(row.id, candidate);
+        break;
+      }
+    }
   }
   return out;
+}
+
+// Candidate filenames for a row, best first. The caller takes the first
+// one not already claimed in the destination folder.
+//
+// The id-based fallbacks escalate in length rather than stopping at a
+// short prefix. Notion mints UUIDs in batches that share a long common
+// prefix — two rows in Kanner's Transcripts DB titled "Master Data 1:
+// Product and Variant model" both start `39e3acdc` and share a date, so
+// an 8-char discriminator still collided and one row lost its file. The
+// last candidate is the full 32-hex id, unique by construction, so this
+// generator can never be exhausted without producing a free name.
+function* nameCandidates(
+  base: string,
+  row: NormalizedRow,
+  alone: boolean,
+  datesUnique: boolean,
+): Generator<string> {
+  // Only an uncontested title keeps the bare slug, so repos whose titles
+  // are already unique see no renames.
+  if (alone) yield base;
+  const date = rowDateStamp(row);
+  if (date && datesUnique) yield `${base}-${date}`;
+  const hex = row.id.replace(/-/g, '');
+  for (const len of [8, 12, 16, 24, 32]) {
+    yield date ? `${base}-${date}-${hex.slice(0, len)}` : `${base}-${hex.slice(0, len)}`;
+  }
 }
 
 // A date-typed property on the row, as YYYY-MM-DD. Notion dates arrive
@@ -494,12 +551,6 @@ function rowDateStamp(row: NormalizedRow): string | undefined {
     if (start && start.length >= 10) return start.slice(0, 10);
   }
   return undefined;
-}
-
-// First 8 hex characters of a Notion UUID — enough to separate rows that
-// collide on both title and date, and stable for the row's lifetime.
-function shortId(id: string): string {
-  return id.replace(/-/g, '').slice(0, 8);
 }
 
 // Read the configured groupByProperty value from a row. Supports the
