@@ -37,6 +37,23 @@ export interface PullResult {
   conflicts: Conflict[];
 }
 
+// Shape version for row frontmatter.
+//
+// The incremental skip reuses a local file whenever Notion's
+// last_edited_time still matches what we wrote. That is correct when
+// only Notion's content can change the output -- but the RENDERER can
+// change too. When relation links were added, every row whose Notion
+// timestamp hadn't moved kept its old `Milestone: null` frontmatter, so
+// a successful pull propagated the new format to almost nothing.
+//
+// Stamping the version into each row and requiring it to match means an
+// output-format change re-renders every row exactly once, then goes back
+// to being a no-op. Bump this whenever renderRowMarkdown's output shape
+// changes.
+//   1 = pre-versioning (relations rendered as null)
+//   2 = relations rendered as {id,title,path} entries
+const FRONTMATTER_VERSION = 2;
+
 // A database exported once in pull()'s indexing pass and reused by
 // pullDatabase, so both agree on the exact filenames rows land at.
 interface PreparedDatabase {
@@ -417,8 +434,14 @@ async function pullDatabase(
     // entirely. This is the difference between a 1000-call full pull
     // and a ~5-call no-op pull on subsequent CI runs.
     const inConflict = mergeMap.has(row.id);
-    const localLastEdited = await readLocalLastEditedTime(filePath);
-    if (!inConflict && localLastEdited === row.lastEditedTime) {
+    const local = await readLocalRowStamp(filePath);
+    // Reuse the local file only when Notion's content is unchanged AND
+    // it was written by the current renderer -- see FRONTMATTER_VERSION.
+    if (
+      !inConflict &&
+      local.lastEditedTime === row.lastEditedTime &&
+      local.formatVersion === FRONTMATTER_VERSION
+    ) {
       const localContent = await readFile(filePath, 'utf-8');
       writtenPaths.add(path.normalize(filePath));
       // Child pages live under <rowSlug>/ — preserve them so prune
@@ -745,6 +768,7 @@ function renderRowMarkdown(
     last_edited_time: row.lastEditedTime,
     title: row.title,
     data_source_id: exp.dataSourceId,
+    sync_format: FRONTMATTER_VERSION,
     properties: enrichRelations(row.properties, exp.schema, relations),
   };
   return `---\n${YAML.stringify(fm).trimEnd()}\n---\n\n# ${row.title}\n\n${trimmedBody}\n`;
@@ -801,20 +825,28 @@ export async function writeFileEnsured(filePath: string, content: string): Promi
 // changed this row/page since we last wrote it." Returns null when the
 // file is missing or has no frontmatter — both indistinguishable from
 // "needs a full fetch."
-async function readLocalLastEditedTime(filePath: string): Promise<string | null> {
+async function readLocalRowStamp(
+  filePath: string,
+): Promise<{ lastEditedTime: string | null; formatVersion: number }> {
+  const miss = { lastEditedTime: null, formatVersion: 0 };
   let content: string;
   try {
     content = await readFile(filePath, 'utf-8');
   } catch {
-    return null;
+    return miss;
   }
   const m = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!m) return null;
+  if (!m) return miss;
   try {
-    const fm = YAML.parse(m[1]!) as { last_edited_time?: unknown };
-    return typeof fm.last_edited_time === 'string' ? fm.last_edited_time : null;
+    const fm = YAML.parse(m[1]!) as { last_edited_time?: unknown; sync_format?: unknown };
+    return {
+      lastEditedTime: typeof fm.last_edited_time === 'string' ? fm.last_edited_time : null,
+      // Files written before versioning existed carry no stamp; treat
+      // them as version 1 so they re-render once and pick it up.
+      formatVersion: typeof fm.sync_format === 'number' ? fm.sync_format : 1,
+    };
   } catch {
-    return null;
+    return miss;
   }
 }
 
