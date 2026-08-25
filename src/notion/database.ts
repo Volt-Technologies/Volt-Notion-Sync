@@ -47,6 +47,7 @@ interface RawPropValue {
   email?: string | null;
   phone_number?: string | null;
   people?: Array<{ name?: string; person?: { email?: string } }>;
+  relation?: Array<{ id: string }>;
 }
 
 export interface DatabaseExport {
@@ -209,6 +210,16 @@ function normalizeValue(prop: RawPropValue): unknown {
       return prop.phone_number ?? null;
     case 'people':
       return (prop.people ?? []).map((p) => p.name ?? p.person?.email ?? '').filter(Boolean);
+    case 'relation':
+      // Notion returns relations as bare `{id}` refs — no title, no
+      // parent database. Emit the raw ids here and let the pull layer
+      // enrich them with the linked row's title and local file path
+      // using the index it builds across all mapped databases.
+      //
+      // Order is preserved: Notion keeps a relation's ordering, and for
+      // properties like "Depends On" or "Subtasks" that ordering is
+      // meaningful to whoever curated it.
+      return (prop.relation ?? []).map((r) => r.id);
     default:
       return null;
   }

@@ -37,6 +37,13 @@ export interface PullResult {
   conflicts: Conflict[];
 }
 
+// A database exported once in pull()'s indexing pass and reused by
+// pullDatabase, so both agree on the exact filenames rows land at.
+interface PreparedDatabase {
+  exp: DatabaseExport;
+  rowSlugs: Map<string, string>;
+}
+
 export async function pull(opts: PullOptions): Promise<PullResult> {
   const log = opts.log ?? (() => {});
   const result: PullResult = {
@@ -78,6 +85,36 @@ export async function pull(opts: PullOptions): Promise<PullResult> {
   );
   const writtenPaths = new Set<string>();
 
+  // Index every database row BEFORE writing anything, so relation
+  // properties can be rendered with the linked row's title and repo
+  // path. The index has to be complete up front: a Waterfall Task's
+  // Milestone relation points at a database that may come later in the
+  // mapping list, and a row can even relate to its own database.
+  //
+  // This costs no extra Notion calls. `exportDatabase` was already run
+  // once per database mapping inside pullDatabase; it now runs here
+  // instead and the result is handed to pullDatabase to reuse.
+  const dbExports = new Map<ResolvedMapping, PreparedDatabase>();
+  const relations: RelationIndex = new Map();
+  for (const mapping of opts.mappings) {
+    if (mapping.resolvedDirection === 'push' || mapping.type !== 'database') continue;
+    const exp = await exportDatabase(opts.client, mapping.resolvedNotionId);
+    const rowSlugs = assignRowSlugs(exp.rows, mapping.groupByProperty, opts.config.notionIgnore);
+    dbExports.set(mapping, { exp, rowSlugs });
+    for (const row of exp.rows) {
+      const slug = rowSlugs.get(row.id);
+      // No slug means the row was filtered by notionIgnore, so no file
+      // will exist for it — leave it out rather than point at nothing.
+      if (!slug) continue;
+      const groupSlug = rowGroupSlug(row, mapping.groupByProperty);
+      relations.set(row.id, {
+        title: row.title,
+        path: path.posix.join(mapping.local, ...(groupSlug ? [groupSlug] : []), slug + '.md'),
+      });
+    }
+  }
+  log(`indexed ${relations.size} row(s) across ${dbExports.size} database(s) for relation links`);
+
   for (const mapping of opts.mappings) {
     if (mapping.resolvedDirection === 'push') {
       log(`skip ${mapping.local} (direction: push)`);
@@ -86,12 +123,29 @@ export async function pull(opts: PullOptions): Promise<PullResult> {
     }
     if (mapping.type === 'database') {
       log(`pull database: ${mapping.notion ?? mapping.notionId} → ${mapping.local}`);
-      const dbResult = await pullDatabase(opts, mapping, state, writtenPaths, skipIds, mergeMap);
+      const dbResult = await pullDatabase(
+        opts,
+        mapping,
+        state,
+        writtenPaths,
+        skipIds,
+        mergeMap,
+        dbExports.get(mapping)!,
+        relations,
+      );
       result.databasesWritten += 1;
       result.rowsWritten += dbResult.rowsWritten;
     } else {
       log(`pull page tree: ${mapping.notion ?? mapping.notionId} → ${mapping.local}`);
-      const pageResult = await pullPageTree(opts, mapping, state, writtenPaths, skipIds, mergeMap);
+      const pageResult = await pullPageTree(
+        opts,
+        mapping,
+        state,
+        writtenPaths,
+        skipIds,
+        mergeMap,
+        relations,
+      );
       result.pagesWritten += pageResult.pagesWritten;
     }
   }
@@ -159,6 +213,7 @@ async function pullPageTree(
   writtenPaths: Set<string>,
   skipIds: Set<string>,
   mergeMap: Map<string, Conflict>,
+  relations: RelationIndex,
 ): Promise<{ pagesWritten: number }> {
   const log = opts.log ?? (() => {});
   let pagesWritten = 0;
@@ -203,7 +258,17 @@ async function pullPageTree(
       const pageFolder = path.posix.dirname(fileRel);
       const flat = node.childDatabaseIds.length === 1;
       for (const dbId of node.childDatabaseIds) {
-        await pullEmbeddedDatabase(opts, dbId, pageFolder, flat, state, writtenPaths, skipIds, mergeMap);
+        await pullEmbeddedDatabase(
+          opts,
+          dbId,
+          pageFolder,
+          flat,
+          state,
+          writtenPaths,
+          skipIds,
+          mergeMap,
+          relations,
+        );
       }
     }
   }
@@ -227,6 +292,7 @@ async function pullEmbeddedDatabase(
   writtenPaths: Set<string>,
   skipIds: Set<string>,
   mergeMap: Map<string, Conflict>,
+  relations: RelationIndex,
 ): Promise<void> {
   const log = opts.log ?? (() => {});
   let exp: DatabaseExport;
@@ -270,7 +336,7 @@ async function pullEmbeddedDatabase(
     const fileRel = path.posix.join(baseFolder, rowSlug + '.md');
     const filePath = path.join(opts.repoRoot, '.volt', fileRel);
     const { markdown: body } = await pageBlocksToMarkdown(opts.client, row.id);
-    const notionContent = renderRowMarkdown(opts.config, row, exp, body);
+    const notionContent = renderRowMarkdown(opts.config, row, exp, body, relations);
     const written = await writeWithMerge(filePath, notionContent, row.id, state, mergeMap, opts.log ?? (() => {}));
     writtenPaths.add(path.normalize(filePath));
 
@@ -299,9 +365,11 @@ async function pullDatabase(
   writtenPaths: Set<string>,
   skipIds: Set<string>,
   mergeMap: Map<string, Conflict>,
+  prepared: PreparedDatabase,
+  relations: RelationIndex,
 ): Promise<{ rowsWritten: number }> {
   const log = opts.log ?? (() => {});
-  const exp: DatabaseExport = await exportDatabase(opts.client, mapping.resolvedNotionId);
+  const exp: DatabaseExport = prepared.exp;
 
   const indexPath = path.posix.join(mapping.local, '_index.json');
   const indexFull = path.join(opts.repoRoot, '.volt', indexPath);
@@ -318,10 +386,10 @@ async function pullDatabase(
   await writeFileEnsured(indexFull, indexContent);
   writtenPaths.add(path.normalize(indexFull));
 
-  // Resolve every row's filename up front — uniqueness is a property of
-  // the row set, not of any one row, so it can't be decided inside the
-  // loop. See assignRowSlugs for the disambiguation rules.
-  const rowSlugs = assignRowSlugs(exp.rows, mapping.groupByProperty, opts.config.notionIgnore);
+  // Filenames were resolved in pull()'s indexing pass — reuse them so
+  // the paths recorded in the relation index are exactly the paths we
+  // write to. See assignRowSlugs for the disambiguation rules.
+  const rowSlugs = prepared.rowSlugs;
 
   let rowsWritten = 0;
   let rowsSkipped = 0;
@@ -377,7 +445,7 @@ async function pullDatabase(
     }
 
     const { markdown: body, childPageIds } = await pageBlocksToMarkdown(opts.client, row.id);
-    const notionContent = renderRowMarkdown(opts.config, row, exp, body);
+    const notionContent = renderRowMarkdown(opts.config, row, exp, body, relations);
     const written = await writeWithMerge(filePath, notionContent, row.id, state, mergeMap, log);
     writtenPaths.add(path.normalize(filePath));
 
@@ -665,6 +733,7 @@ function renderRowMarkdown(
   row: NormalizedRow,
   exp: DatabaseExport,
   body: string,
+  relations: RelationIndex,
 ): string {
   const trimmedBody = body.trim();
   if (!config.markdown.frontmatter) {
@@ -676,9 +745,50 @@ function renderRowMarkdown(
     last_edited_time: row.lastEditedTime,
     title: row.title,
     data_source_id: exp.dataSourceId,
-    properties: row.properties,
+    properties: enrichRelations(row.properties, exp.schema, relations),
   };
   return `---\n${YAML.stringify(fm).trimEnd()}\n---\n\n# ${row.title}\n\n${trimmedBody}\n`;
+}
+
+// Where a relation points, once resolved: the linked row's title and the
+// path of the markdown file mirroring it, relative to `.volt/`.
+export interface RelationTarget {
+  title: string;
+  path: string;
+}
+
+export type RelationIndex = Map<string, RelationTarget>;
+
+// Turn a row's relation properties from bare Notion ids into entries a
+// reader can actually follow.
+//
+// `normalizeValue` emits relations as `string[]` of row ids, because a
+// relation payload carries nothing else — no title, no parent database.
+// Here we swap in the linked row's title and repo path from the index
+// built across every mapped database.
+//
+// A relation can point somewhere the index doesn't cover: a database
+// this repo doesn't map, one whose mapping is `direction: push`, or a
+// database embedded in a page (those are discovered mid-walk, after the
+// index is built). Those keep `{ id }` alone rather than being dropped,
+// so the link is still recorded and still followable via the Notion API.
+function enrichRelations(
+  properties: Record<string, unknown>,
+  schema: DatabaseExport['schema'],
+  relations: RelationIndex,
+): Record<string, unknown> {
+  let out: Record<string, unknown> | undefined;
+  for (const [name, meta] of Object.entries(schema)) {
+    if (meta.type !== 'relation') continue;
+    const ids = properties[name];
+    if (!Array.isArray(ids)) continue;
+    out ??= { ...properties };
+    out[name] = (ids as string[]).map((id) => {
+      const target = relations.get(id);
+      return target ? { id, title: target.title, path: target.path } : { id };
+    });
+  }
+  return out ?? properties;
 }
 
 export async function writeFileEnsured(filePath: string, content: string): Promise<void> {
