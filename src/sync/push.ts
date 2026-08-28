@@ -23,6 +23,9 @@ export interface PushResult {
   rowsUpdated: number;
   rowsCreated: number;
   skipped: number;
+  // Files whose push threw. The run keeps going past them so one bad page
+  // can't hide the rest; the CLI turns a non-empty list into exit code 1.
+  failed: Array<{ file: string; error: string }>;
 }
 
 export async function push(opts: PushOptions): Promise<PushResult> {
@@ -33,6 +36,7 @@ export async function push(opts: PushOptions): Promise<PushResult> {
     rowsUpdated: 0,
     rowsCreated: 0,
     skipped: 0,
+    failed: [],
   };
 
   const state = await loadState(opts.repoRoot);
@@ -52,40 +56,61 @@ export async function push(opts: PushOptions): Promise<PushResult> {
   const enforceNotionWins = opts.config.conflictPolicy !== 'github-wins';
 
   for (const file of files) {
-    const parsed = await parseMarkdownFile(file.absPath);
-    // Skip files whose content matches what we recorded after the last sync.
-    if (parsed.notionId) {
-      const recorded = state.entries[parsed.notionId];
-      const currentHash = hashContent(await readFile(file.absPath, 'utf-8'));
-      if (recorded && recorded.contentHash === currentHash) {
-        log(`  unchanged, skip: ${file.relPath}`);
-        result.skipped += 1;
-        continue;
-      }
-      if (enforceNotionWins && recorded) {
-        const remoteChanged = await hasRemoteAdvanced(opts.client, parsed.notionId, recorded.notionLastEditedTime);
-        if (remoteChanged) {
-          log(`  notion-wins, skip (remote changed): ${file.relPath}`);
-          result.skipped += 1;
-          continue;
-        }
-      }
-    }
-    const depth = fileDepth(file);
-    if (file.mapping.type === 'database') {
-      if (await isDatabaseRow(file, depth)) {
-        await pushDatabaseRow(opts, file, parsed, state, result, log);
-      } else {
-        await pushRowChildPage(opts, file, parsed, state, result, log);
-      }
-    } else {
-      await pushPage(opts, file, parsed, state, result, log);
+    try {
+      await pushFile(opts, file, state, result, log, enforceNotionWins);
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      log(`  FAILED ${file.relPath}: ${error}`);
+      result.failed.push({ file: file.relPath, error });
     }
   }
 
   state.lastPushAt = new Date().toISOString();
   await saveState(opts.repoRoot, state);
+  if (result.failed.length > 0) {
+    log(`  ${result.failed.length} file(s) failed to push:`);
+    for (const f of result.failed) log(`    ${f.file} — ${f.error}`);
+  }
   return result;
+}
+
+async function pushFile(
+  opts: PushOptions,
+  file: LocalFile,
+  state: SyncState,
+  result: PushResult,
+  log: (m: string) => void,
+  enforceNotionWins: boolean,
+): Promise<void> {
+  const parsed = await parseMarkdownFile(file.absPath);
+  // Skip files whose content matches what we recorded after the last sync.
+  if (parsed.notionId) {
+    const recorded = state.entries[parsed.notionId];
+    const currentHash = hashContent(await readFile(file.absPath, 'utf-8'));
+    if (recorded && recorded.contentHash === currentHash) {
+      log(`  unchanged, skip: ${file.relPath}`);
+      result.skipped += 1;
+      return;
+    }
+    if (enforceNotionWins && recorded) {
+      const remoteChanged = await hasRemoteAdvanced(opts.client, parsed.notionId, recorded.notionLastEditedTime);
+      if (remoteChanged) {
+        log(`  notion-wins, skip (remote changed): ${file.relPath}`);
+        result.skipped += 1;
+        return;
+      }
+    }
+  }
+  const depth = fileDepth(file);
+  if (file.mapping.type === 'database') {
+    if (await isDatabaseRow(file, depth)) {
+      await pushDatabaseRow(opts, file, parsed, state, result, log);
+    } else {
+      await pushRowChildPage(opts, file, parsed, state, result, log);
+    }
+  } else {
+    await pushPage(opts, file, parsed, state, result, log);
+  }
 }
 
 // Depth of `file.relPath` relative to its mapping. A file directly inside
