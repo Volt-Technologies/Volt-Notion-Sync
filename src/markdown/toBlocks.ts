@@ -155,6 +155,11 @@ function tokenToBlocks(token: Token): NotionBlock[] {
         },
       ];
     }
+    // Raw HTML has no Notion equivalent. This is also where pull's
+    // `<!-- unsupported block: <type> -->` placeholder lands, and it must
+    // stay dropped: the API can't create those block types (AI blocks
+    // surface as `unsupported` and are rejected outright for integration
+    // bots), so replacePageBlocks keeps the original block in place instead.
     case 'html':
       return [];
     default: {

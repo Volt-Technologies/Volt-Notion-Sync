@@ -101,6 +101,7 @@ program
       log: (m) => console.log(m),
     });
     console.log(JSON.stringify(result, null, 2));
+    failIfAnyPushFailed(result);
   });
 
 program
@@ -164,6 +165,7 @@ program
       log: (m) => console.log(`[push] ${m}`),
     });
     console.log('push:', JSON.stringify(pushed));
+    failIfAnyPushFailed(pushed);
   });
 
 program
@@ -397,6 +399,16 @@ async function exists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// A push that lost files must not report success to CI, but it also must
+// not abort mid-run — every other file has already been pushed and the
+// state file saved by the time we get here. exitCode (not exit()) lets
+// stdout flush.
+function failIfAnyPushFailed(result: { failed: Array<{ file: string; error: string }> }): void {
+  if (result.failed.length === 0) return;
+  console.error(`error: push failed for ${result.failed.length} file(s) — see FAILED lines above`);
+  process.exitCode = 1;
 }
 
 function die(msg: string): never {
