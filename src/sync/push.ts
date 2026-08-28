@@ -285,13 +285,21 @@ async function pushRowChildPage(
   }
 }
 
-async function replacePageBlocks(
+export async function replacePageBlocks(
   client: Client,
   pageId: string,
   blocks: unknown[],
 ): Promise<void> {
   const existing = await listChildBlocks(client, pageId);
   for (const b of existing) {
+    // Blocks the API exposes only as type `unsupported` (Notion AI blocks
+    // today) are off-limits for an integration bot: listing their children,
+    // deleting them and re-creating them all fail with "Block type ai_block
+    // is not supported via the API for your bot type". Pull renders them as
+    // `<!-- unsupported block: unsupported -->` and markdownToBlocks drops
+    // that comment, so the only lossless option is to leave the original
+    // block where it is and append the pushed content around it.
+    if (b.type === 'unsupported') continue;
     // HARD INVARIANT: GitHub → Notion sync must NEVER delete a Notion
     // page or database. In Notion's data model a sub-page is a
     // `child_page` block and an embedded database is a `child_database`
@@ -343,8 +351,15 @@ async function isPageOrDatabaseCarrier(
 ): Promise<boolean> {
   if (block.type === 'child_page' || block.type === 'child_database') return true;
   if (!block.has_children) return false;
-  const descendants = await collectNamedChildren(client, block.id);
-  return descendants.length > 0;
+  try {
+    const descendants = await collectNamedChildren(client, block.id);
+    return descendants.length > 0;
+  } catch {
+    // If Notion won't let us look inside a block we can't prove it holds
+    // no page/database, so treat it as a carrier and keep it. Preserving
+    // one block too many is recoverable; archiving a page is not.
+    return true;
+  }
 }
 
 function titleProperty(title: string): Record<string, unknown> {

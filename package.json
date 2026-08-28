@@ -21,6 +21,7 @@
     "watch": "tsc -w",
     "clean": "rimraf dist bundle",
     "typecheck": "tsc --noEmit",
+    "test": "tsc && node --test",
     "bundle": "tsc && esbuild src/cli.ts --bundle --platform=node --target=node20 --format=cjs --outfile=bundle/volt-notion-sync.cjs",
     "start": "node dist/cli.js",
     "pull": "npm run build && node dist/cli.js pull",
